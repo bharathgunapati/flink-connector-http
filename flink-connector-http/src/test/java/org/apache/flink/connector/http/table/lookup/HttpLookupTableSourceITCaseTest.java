@@ -977,7 +977,7 @@ class HttpLookupTableSourceITCaseTest {
                         + "'http.source.lookup.query-creator' = 'http-generic-json-url',"
                         + "'http.request.body-template' = '{\"customerId\":\"1\"}',"
                         + "'lookup.cache' = 'NONE',"
-                        + "'http.source.lookup.request.timeout' = '30',"
+                        + "'http.source.lookup.request.timeout' = '30s',"
                         + "'http.source.lookup.request.thread-pool.size' = '8',"
                         + "'http.source.lookup.response.thread-pool.size' = '4'"
                         + ")";
@@ -1073,6 +1073,46 @@ class HttpLookupTableSourceITCaseTest {
             LookupCacheManager.getInstance().clear();
             LookupCacheManager.keepCacheOnRelease(false);
         }
+    }
+
+    /**
+     * Regression test for FLINK-40072 (defect introduced by FLINK-39364 / #31): a lookup table
+     * declared with a Duration-typed request timeout such as {@code '30s'} must work end to end.
+     * Before the runtime was wired to the {@code SOURCE_LOOKUP_REQUEST_TIMEOUT} ConfigOption, this
+     * DDL passed validation (the {@code http.} namespace is skipped by {@code validateExcept}) but
+     * the lookup crashed at query time with {@code NumberFormatException} from {@code
+     * Integer.parseInt("30s")}.
+     */
+    @Test
+    void testHttpLookupJoinWithDurationRequestTimeout() throws Exception {
+        setupServerStub(wireMockServer);
+
+        String lookupTable =
+                "CREATE TABLE Customers ("
+                        + "id STRING,"
+                        + "id2 STRING,"
+                        + "msg STRING,"
+                        + "uuid STRING,"
+                        + "details ROW<"
+                        + "isActive BOOLEAN,"
+                        + "nestedDetails ROW<"
+                        + "balance STRING"
+                        + ">"
+                        + ">"
+                        + ") WITH ("
+                        + "'format' = 'json',"
+                        + "'connector' = 'http',"
+                        + "'lookup-method' = 'GET',"
+                        + "'url' = 'http://localhost:"
+                        + serverPort
+                        + "/client',"
+                        + "'http.source.lookup.header.Content-Type' = 'application/json',"
+                        + "'http.source.lookup.request.timeout' = '30s'"
+                        + ")";
+
+        SortedSet<Row> rows = testLookupJoin(lookupTable, 4);
+
+        assertEnrichedRows(rows);
     }
 
     private LookupCache getCache() {

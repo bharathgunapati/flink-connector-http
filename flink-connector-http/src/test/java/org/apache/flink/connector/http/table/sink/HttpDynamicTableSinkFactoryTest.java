@@ -25,6 +25,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -125,9 +126,13 @@ public class HttpDynamicTableSinkFactoryTest {
                         "http://localhost/",
                         HttpDynamicSinkConnectorOptions.SINK_REQUEST_TIMEOUT.key());
         tEnv.executeSql(withRequestTimeout);
-        // Should not throw ValidationException for the option itself
-        // (a RuntimeException for actual HTTP calls is fine in test)
-        assertThatThrownBy(() -> tEnv.executeSql("INSERT INTO httpTimeout VALUES (1)").await())
-                .isNotInstanceOf(org.apache.flink.table.api.ValidationException.class);
+        // The duration-typed option must be recognized: executing the INSERT must not
+        // raise a ValidationException. Any other outcome (a successful run, or a runtime
+        // error from the actual HTTP call) is acceptable for this factory-level check.
+        try {
+            tEnv.executeSql("INSERT INTO httpTimeout VALUES (1)").await();
+        } catch (Exception e) {
+            assertThat(e).isNotInstanceOf(ValidationException.class);
+        }
     }
 }

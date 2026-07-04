@@ -20,11 +20,13 @@ package org.apache.flink.connector.http.table.lookup;
 
 import org.apache.flink.configuration.Configuration;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +36,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.connector.http.table.lookup.HttpLookupConnectorOptions.LOOKUP_HTTP_VERSION;
+import static org.apache.flink.connector.http.table.lookup.HttpLookupConnectorOptions.SOURCE_LOOKUP_REQUEST_TIMEOUT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Test for {@link BodyBasedRequestFactory}. */
@@ -74,6 +77,56 @@ public class BodyBasedRequestFactoryTest {
             URI uri = bodyBasedRequestFactory.constructUri(lookupQueryInfo);
             assertThat(uri.toString()).isEqualTo(testSpec.expected);
         }
+    }
+
+    /**
+     * FLINK-39364 (#31) declared {@code http.source.lookup.request.timeout} as a {@code
+     * durationType()} option, but the runtime kept reading it with {@code Integer.parseInt(...)}. A
+     * unit-suffixed value such as {@code "30s"} therefore threw {@link NumberFormatException} when
+     * the request was built. This asserts the value is now parsed as a real {@link Duration}.
+     */
+    @Test
+    void requestTimeoutWithSecondUnitIsParsedAsDuration() {
+        assertThat(factoryWithRequestTimeout("30s").httpRequestTimeout)
+                .isEqualTo(Duration.ofSeconds(30));
+    }
+
+    @Test
+    void requestTimeoutSupportsMinuteUnit() {
+        assertThat(factoryWithRequestTimeout("1 min").httpRequestTimeout)
+                .isEqualTo(Duration.ofMinutes(1));
+    }
+
+    @Test
+    void requestTimeoutDefaultsToThirtySeconds() {
+        RequestFactoryBase factory =
+                new BodyBasedRequestFactory("GET", null, null, lookupConfig(new Configuration()));
+        assertThat(factory.httpRequestTimeout).isEqualTo(Duration.ofSeconds(30));
+    }
+
+    /**
+     * Documents the intended behavioural change versus the old int-seconds read: a bare number now
+     * follows the standard Flink {@link Duration} convention and is interpreted as milliseconds.
+     */
+    @Test
+    void bareNumberIsInterpretedAsMillisecondsPerFlinkDurationConvention() {
+        assertThat(factoryWithRequestTimeout("30").httpRequestTimeout)
+                .isEqualTo(Duration.ofMillis(30));
+    }
+
+    private static RequestFactoryBase factoryWithRequestTimeout(String value) {
+        Configuration configuration =
+                Configuration.fromMap(Map.of(SOURCE_LOOKUP_REQUEST_TIMEOUT.key(), value));
+        return new BodyBasedRequestFactory("GET", null, null, lookupConfig(configuration));
+    }
+
+    private static HttpLookupConfig lookupConfig(Configuration configuration) {
+        return HttpLookupConfig.builder()
+                .lookupMethod("GET")
+                .url("http://service")
+                .useAsync(false)
+                .readableConfig(configuration)
+                .build();
     }
 
     private static class TestSpec {

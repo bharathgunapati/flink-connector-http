@@ -31,7 +31,6 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -138,7 +137,7 @@ public class BatchRequestSubmitter extends AbstractRequestSubmitter {
                     java.net.http.HttpRequest.newBuilder()
                             .uri(endpointUri)
                             .version(Version.HTTP_1_1)
-                            .timeout(Duration.ofSeconds(httpRequestTimeOutSeconds))
+                            .timeout(httpRequestTimeout)
                             .method(method, publisher);
 
             if (headersAndValues.length != 0) {

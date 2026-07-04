@@ -19,9 +19,11 @@ package org.apache.flink.connector.http.sink.httpclient;
 
 import org.apache.flink.connector.http.config.HttpConnectorConfigConstants;
 import org.apache.flink.connector.http.utils.ThreadUtils;
+import org.apache.flink.util.TimeUtils;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
 
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,12 +33,12 @@ public abstract class AbstractRequestSubmitter implements RequestSubmitter {
 
     protected static final int HTTP_CLIENT_PUBLISHING_THREAD_POOL_SIZE = 1;
 
-    protected static final String DEFAULT_REQUEST_TIMEOUT_SECONDS = "30";
+    protected static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     /** Thread pool to handle HTTP response from HTTP client. */
     protected final ExecutorService publishingThreadPool;
 
-    protected final int httpRequestTimeOutSeconds;
+    protected final Duration httpRequestTimeout;
 
     protected final String[] headersAndValues;
 
@@ -53,11 +55,12 @@ public abstract class AbstractRequestSubmitter implements RequestSubmitter {
                                 "http-sink-client-response-worker",
                                 ThreadUtils.LOGGING_EXCEPTION_HANDLER));
 
-        this.httpRequestTimeOutSeconds =
-                Integer.parseInt(
-                        properties.getProperty(
-                                HttpConnectorConfigConstants.SINK_HTTP_TIMEOUT_SECONDS,
-                                DEFAULT_REQUEST_TIMEOUT_SECONDS));
+        String requestTimeout =
+                properties.getProperty(HttpConnectorConfigConstants.SINK_HTTP_TIMEOUT_SECONDS);
+        this.httpRequestTimeout =
+                requestTimeout == null
+                        ? DEFAULT_REQUEST_TIMEOUT
+                        : TimeUtils.parseDuration(requestTimeout);
 
         this.httpClient = httpClient;
     }
