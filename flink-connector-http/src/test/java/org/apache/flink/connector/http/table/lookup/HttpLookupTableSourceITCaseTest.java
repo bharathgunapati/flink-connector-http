@@ -1075,6 +1075,46 @@ class HttpLookupTableSourceITCaseTest {
         }
     }
 
+    /**
+     * End-user reproduction for FLINK-40072 (the request.timeout Duration defect introduced by
+     * FLINK-39364 / #31): a lookup table declared with a Duration-typed request timeout such as
+     * {@code '30s'} is accepted at {@code CREATE TABLE} time (the {@code http.} namespace is
+     * skipped by {@code validateExcept}), but on this pre-fix runtime the value is read via {@code
+     * Integer.parseInt("30s")}, so the lookup fails at query time with {@code
+     * NumberFormatException}. This test asserts that end-user-visible failure. After the fix it
+     * would instead succeed and enrich the rows.
+     */
+    @Test
+    void testHttpLookupJoinWithDurationRequestTimeoutFailsOnPreFixRuntime() throws Exception {
+        setupServerStub(wireMockServer);
+
+        String lookupTable =
+                "CREATE TABLE Customers ("
+                        + "id STRING,"
+                        + "id2 STRING,"
+                        + "msg STRING,"
+                        + "uuid STRING,"
+                        + "details ROW<"
+                        + "isActive BOOLEAN,"
+                        + "nestedDetails ROW<"
+                        + "balance STRING"
+                        + ">"
+                        + ">"
+                        + ") WITH ("
+                        + "'format' = 'json',"
+                        + "'connector' = 'http',"
+                        + "'lookup-method' = 'GET',"
+                        + "'url' = 'http://localhost:"
+                        + serverPort
+                        + "/client',"
+                        + "'http.source.lookup.header.Content-Type' = 'application/json',"
+                        + "'http.source.lookup.request.timeout' = '30s'"
+                        + ")";
+
+        assertThatThrownBy(() -> testLookupJoin(lookupTable, 4))
+                .hasStackTraceContaining("For input string: \"30s\"");
+    }
+
     private LookupCache getCache() {
         Map<String, LookupCacheManager.RefCountedCache> managedCaches =
                 LookupCacheManager.getInstance().getManagedCaches();
