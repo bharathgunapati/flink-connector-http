@@ -977,6 +977,8 @@ class HttpLookupTableSourceITCaseTest {
                         + "'http.source.lookup.query-creator' = 'http-generic-json-url',"
                         + "'http.request.body-template' = '{\"customerId\":\"1\"}',"
                         + "'lookup.cache' = 'NONE',"
+                        // Dormant fixture: use Duration syntax ('30s'); active coverage is
+                        // testHttpLookupJoinWithDurationRequestTimeout.
                         + "'http.source.lookup.request.timeout' = '30s',"
                         + "'http.source.lookup.request.thread-pool.size' = '8',"
                         + "'http.source.lookup.response.thread-pool.size' = '4'"

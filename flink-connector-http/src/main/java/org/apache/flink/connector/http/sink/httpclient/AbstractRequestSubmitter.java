@@ -55,6 +55,8 @@ public abstract class AbstractRequestSubmitter implements RequestSubmitter {
                                 "http-sink-client-response-worker",
                                 ThreadUtils.LOGGING_EXCEPTION_HANDLER));
 
+        // Sink submitters are wired with Properties today; reading SINK_REQUEST_TIMEOUT from
+        // ReadableConfig will be handled in a follow-up sink config-unification PR.
         String requestTimeout =
                 properties.getProperty(HttpConnectorConfigConstants.SINK_HTTP_TIMEOUT_SECONDS);
         this.httpRequestTimeout =

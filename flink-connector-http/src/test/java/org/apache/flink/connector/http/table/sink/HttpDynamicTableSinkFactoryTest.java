@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 /**
  * Unfortunately it seems that Flink is lazy with connector instantiation, so one has to call INSERT
@@ -126,13 +127,12 @@ public class HttpDynamicTableSinkFactoryTest {
                         "http://localhost/",
                         HttpDynamicSinkConnectorOptions.SINK_REQUEST_TIMEOUT.key());
         tEnv.executeSql(withRequestTimeout);
-        // The duration-typed option must be recognized: executing the INSERT must not
-        // raise a ValidationException. Any other outcome (a successful run, or a runtime
-        // error from the actual HTTP call) is acceptable for this factory-level check.
-        try {
-            tEnv.executeSql("INSERT INTO httpTimeout VALUES (1)").await();
-        } catch (Exception e) {
-            assertThat(e).isNotInstanceOf(ValidationException.class);
-        }
+        // The duration-typed option must be recognized at DDL time; INSERT may fail at runtime
+        // (e.g. no HTTP server) but must not raise ValidationException.
+        Throwable insertFailure =
+                catchThrowable(() -> tEnv.executeSql("INSERT INTO httpTimeout VALUES (1)").await());
+        assertThat(insertFailure instanceof ValidationException)
+                .as("request.timeout must be a recognized option")
+                .isFalse();
     }
 }

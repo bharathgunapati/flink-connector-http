@@ -99,6 +99,7 @@ public class BodyBasedRequestFactoryTest {
 
     @Test
     void requestTimeoutDefaultsToThirtySeconds() {
+        // Empty Configuration: key unset, so readableConfig.get(...) returns the option default.
         RequestFactoryBase factory =
                 new BodyBasedRequestFactory("GET", null, null, lookupConfig(new Configuration()));
         assertThat(factory.httpRequestTimeout).isEqualTo(Duration.ofSeconds(30));
