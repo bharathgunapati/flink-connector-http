@@ -131,8 +131,10 @@ public class HttpDynamicTableSinkFactoryTest {
         // (e.g. no HTTP server) but must not raise ValidationException.
         Throwable insertFailure =
                 catchThrowable(() -> tEnv.executeSql("INSERT INTO httpTimeout VALUES (1)").await());
-        assertThat(insertFailure instanceof ValidationException)
-                .as("request.timeout must be a recognized option")
-                .isFalse();
+        if (insertFailure != null) {
+            assertThat(insertFailure)
+                    .as("request.timeout must be a recognized option")
+                    .isNotInstanceOf(ValidationException.class);
+        }
     }
 }
