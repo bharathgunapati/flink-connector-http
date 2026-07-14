@@ -192,7 +192,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true',"
+                        + "'async-polling' = 'true',"
                         + "'table.exec.async-lookup.buffer-capacity' = '50',"
                         + "'table.exec.async-lookup.timeout' = '20s'"
                         + ")";
@@ -228,7 +228,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true'"
+                        + "'async-polling' = 'true'"
                         + ")";
 
         // WHEN/THEN
@@ -373,7 +373,7 @@ class HttpLookupTableSourceITCaseTest {
                                 + secServerPort
                                 + "/client',"
                                 + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                                + "'asyncPolling' = 'true',"
+                                + "'async-polling' = 'true',"
                                 + "'http.security.cert.server' = '%s',"
                                 + "'http.security.cert.client' = '%s',"
                                 + "'http.security.key.client' = '%s'"
@@ -433,7 +433,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true'"
+                        + "'async-polling' = 'true'"
                         + ")";
 
         tEnv.executeSql(sourceTable);
@@ -509,7 +509,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true'"
+                        + "'async-polling' = 'true'"
                         + ")";
 
         tEnv.executeSql(sourceTable);
@@ -585,7 +585,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true'"
+                        + "'async-polling' = 'true'"
                         + ")";
 
         tEnv.executeSql(sourceTable);
@@ -655,7 +655,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true'"
+                        + "'async-polling' = 'true'"
                         + ")";
 
         tEnv.executeSql(sourceTable);
@@ -773,7 +773,7 @@ class HttpLookupTableSourceITCaseTest {
                                         + authHeaderRawValue
                                         + "',")
                                 : "")
-                        + "'asyncPolling' = 'true'"
+                        + "'async-polling' = 'true'"
                         + ")";
 
         tEnv.executeSql(sourceTable);
@@ -874,7 +874,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true'"
+                        + "'async-polling' = 'true'"
                         + ")";
 
         tEnv.executeSql(sourceTable);
@@ -972,7 +972,7 @@ class HttpLookupTableSourceITCaseTest {
                         + "'url' = '{{url}}',"
                         + "'http.request.url-map' = 'url:url',"
                         + "'format' = 'json',"
-                        + "'asyncPolling' = 'false',"
+                        + "'async-polling' = 'false',"
                         + "'lookup-method' = 'POST',"
                         + "'http.source.lookup.query-creator' = 'http-generic-json-url',"
                         + "'http.request.body-template' = '{\"customerId\":\"1\"}',"
@@ -1040,7 +1040,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + (isAsync ? "'asyncPolling' = 'true'," : "")
+                        + (isAsync ? "'async-polling' = 'true'," : "")
                         + "'lookup.cache' = 'partial',"
                         + "'lookup.partial-cache.max-rows' = '100'"
                         + ")";
@@ -1182,7 +1182,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true',"
+                        + "'async-polling' = 'true',"
                         + "'lookup-request.format' = 'json',"
                         + "'table.exec.async-lookup.buffer-capacity' = '50',"
                         + "'table.exec.async-lookup.timeout' = '20s',"
@@ -1279,7 +1279,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort2
                         + "/client?customer={{customer}}&id2={{id2}}',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true',"
+                        + "'async-polling' = 'true',"
                         + "'http.source.lookup.query-creator' = 'http-generic-json-url',"
                         + "'table.exec.async-lookup.buffer-capacity' = '50',"
                         + "'table.exec.async-lookup.timeout' = '20s',"
@@ -1369,7 +1369,7 @@ class HttpLookupTableSourceITCaseTest {
                         + serverPort
                         + "/client',"
                         + "'http.source.lookup.header.Content-Type' = 'application/json',"
-                        + "'asyncPolling' = 'true',"
+                        + "'async-polling' = 'true',"
                         + "'http.source.lookup.query-creator' = 'http-generic-json-url',"
                         + "'lookup-request.format' = 'json',"
                         + "'table.exec.async-lookup.buffer-capacity' = '50',"
@@ -1954,7 +1954,7 @@ class HttpLookupTableSourceITCaseTest {
                 .append("'http.source.lookup.continue-on-error'='")
                 .append(spec.continueOnError)
                 .append("',");
-        sql.append("'asyncPolling' = '")
+        sql.append("'async-polling' = '")
                 .append(spec.useAsync ? "true" : "false")
                 .append("',")
                 .append("'table.exec.async-lookup.buffer-capacity' = '50',")

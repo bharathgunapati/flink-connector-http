@@ -64,10 +64,13 @@ public class HttpLookupConnectorOptions {
                     .withDescription("The arguments that should be used for HTTP GET Request.");
 
     public static final ConfigOption<Boolean> ASYNC_POLLING =
-            ConfigOptions.key("asyncPolling")
+            ConfigOptions.key("async-polling")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription("Whether to use Sync and Async polling mechanism");
+                    .withDeprecatedKeys("asyncPolling")
+                    .withDescription(
+                            "Whether to use sync or async polling mechanism. Deprecated alias:"
+                                    + " asyncPolling");
 
     public static final ConfigOption<String> LOOKUP_METHOD =
             ConfigOptions.key("lookup-method")

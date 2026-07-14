@@ -28,6 +28,8 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -136,6 +138,14 @@ public class HttpLookupTableSourceFactoryTest {
         Map<String, String> options = getMandatoryOptions();
         DynamicTableSource source = createTableSource(SCHEMA, options);
         assertThat(source).isNotNull();
+        assertThat(source).isInstanceOf(HttpLookupTableSource.class);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"async-polling", "asyncPolling"})
+    void shouldAcceptAsyncPollingAtFactory(String asyncOptionKey) {
+        Map<String, String> options = getOptions(Map.of(asyncOptionKey, "true"));
+        DynamicTableSource source = createTableSource(SCHEMA, options);
         assertThat(source).isInstanceOf(HttpLookupTableSource.class);
     }
 

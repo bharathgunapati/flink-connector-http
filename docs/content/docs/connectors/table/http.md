@@ -196,7 +196,7 @@ CREATE TABLE Customers (
 'connector' = 'http',
 'format' = 'json',
 'url' = 'http://localhost:8080/client',
-'asyncPolling' = 'true'
+'async-polling' = 'true'
 )
 ```
 
@@ -251,7 +251,7 @@ Note the options with the prefix _http_ are the HTTP connector specific options,
 | connector                                                              | required | The Value should be set to _http_                                                                                                                                                                                                                                                                                                                                                                      |
 | format                                                                 | required | Flink's format name that should be used to decode REST response, Use `json` for a typical REST endpoint.                                                                                                                                                                                                                                                                                               |
 | url                                                                    | required | The base URL that should be used for GET requests. For example _http://localhost:8080/client_                                                                                                                                                                                                                                                                                                          |
-| asyncPolling                                                           | optional | true/false - determines whether Async Polling should be used. Mechanism is based on Flink's Async I/O.                                                                                                                                                                                                                                                                                                 |
+| async-polling                                                          | optional | true/false - determines whether async polling should be used. Mechanism is based on Flink's Async I/O. Deprecated alias: `asyncPolling`.                                                                                                                                                                                                                                                                 |
 | lookup-method                                                          | optional | GET/POST/PUT (and any other) - determines what REST method should be used for lookup REST query. If not specified, `GET` method will be used.                                                                                                                                                                                                                                                          |
 | lookup.cache                                                           | optional | Enum possible values: `NONE`, `PARTIAL`. The cache strategy for the lookup table. Currently supports `NONE` (no caching) and `PARTIAL` (caching entries on lookup operation in external API).                                                                                                                                                                                                          |
 | lookup.partial-cache.max-rows                                          | optional | The max number of rows of lookup cache, over this value, the oldest rows will be expired. `lookup.cache` must be set to `PARTIAL` to use this option. See the following <a href="#lookup-cache">Lookup Cache</a> section for more details.                                                                                                                                                             |
@@ -495,7 +495,7 @@ CREATE TABLE http-lookup (
   'connector' = 'http',
   'format' = 'json',
   'url' = 'http://localhost:8080/client',
-  'asyncPolling' = 'true',
+  'async-polling' = 'true',
   'http.source.lookup.header.Origin' = '*',
   'http.source.lookup.header.X-Content-Type-Options' = 'nosniff',
   'http.source.lookup.header.Content-Type' = 'application/json'

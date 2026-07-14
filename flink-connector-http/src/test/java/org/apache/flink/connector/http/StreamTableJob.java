@@ -44,7 +44,7 @@ public class StreamTableJob {
                         + " 'url' = 'http://localhost:"
                         + WireMockServerPortAllocator.getServerPort()
                         + "/client', "
-                        + "'asyncPolling' = 'true', "
+                        + "'async-polling' = 'true', "
                         + "'field.isActive.path' = '$.details.isActive', "
                         + "'field.balance.path' = '$.details.nestedDetails.balance')");
 
