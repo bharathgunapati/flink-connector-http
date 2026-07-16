@@ -27,6 +27,7 @@ import org.apache.flink.connector.http.config.HttpConnectorConfigConstants;
 import org.apache.flink.connector.http.utils.ConfigUtils;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.DataTypes.Field;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.format.DecodingFormat;
@@ -42,7 +43,9 @@ import org.apache.flink.table.types.DataType;
 
 import javax.annotation.Nullable;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -115,7 +118,8 @@ public class HttpLookupTableSourceFactory implements DynamicTableSourceFactory {
                 "lookup-request.",
                 HttpConnectorConfigConstants.FLINK_CONNECTOR_HTTP,
                 LOOKUP_REQUEST_FORMAT.key());
-        validateHttpLookupSourceOptions(readable);
+        validateHttpLookupSourceOptions(
+                readable, dynamicTableContext.getCatalogTable().getOptions());
 
         HttpLookupConfig lookupConfig = getHttpLookupOptions(dynamicTableContext, readable);
 
@@ -134,6 +138,25 @@ public class HttpLookupTableSourceFactory implements DynamicTableSourceFactory {
 
     protected void validateHttpLookupSourceOptions(ReadableConfig tableOptions)
             throws IllegalArgumentException {
+        validateHttpLookupSourceOptions(tableOptions, Collections.emptyMap());
+    }
+
+    protected void validateHttpLookupSourceOptions(
+            ReadableConfig tableOptions, Map<String, String> rawOptions)
+            throws IllegalArgumentException {
+        if (rawOptions.containsKey(ASYNC_POLLING.key())
+                && rawOptions.containsKey(
+                        HttpLookupConnectorOptions.DEPRECATED_ASYNC_POLLING_KEY)) {
+            throw new ValidationException(
+                    "Cannot set both '"
+                            + ASYNC_POLLING.key()
+                            + "' and '"
+                            + HttpLookupConnectorOptions.DEPRECATED_ASYNC_POLLING_KEY
+                            + "'. Use '"
+                            + ASYNC_POLLING.key()
+                            + "' for new configurations.");
+        }
+
         // ensure that there is an OIDC token request if we have an OIDC token endpoint
         tableOptions
                 .getOptional(SOURCE_LOOKUP_OIDC_AUTH_TOKEN_ENDPOINT_URL)

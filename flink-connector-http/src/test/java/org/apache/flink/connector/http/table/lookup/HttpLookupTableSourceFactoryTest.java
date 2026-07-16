@@ -149,6 +149,14 @@ public class HttpLookupTableSourceFactoryTest {
         assertThat(source).isInstanceOf(HttpLookupTableSource.class);
     }
 
+    @Test
+    void shouldRejectBothAsyncPollingKeys() {
+        Map<String, String> options =
+                getOptions(Map.of("async-polling", "true", "asyncPolling", "false"));
+        assertThatExceptionOfType(ValidationException.class)
+                .isThrownBy(() -> createTableSource(SCHEMA, options));
+    }
+
     private Map<String, String> getMandatoryOptions() {
         return Map.of(
                 "connector", "http",
