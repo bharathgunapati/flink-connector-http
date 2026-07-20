@@ -44,14 +44,12 @@ import static org.apache.flink.connector.http.config.HttpConnectorConfigConstant
 @Slf4j
 public abstract class RequestFactoryBase implements HttpRequestFactory {
 
-    public static final String DEFAULT_REQUEST_TIMEOUT_SECONDS = "30";
-
     /** Base url used for {@link HttpRequest} for example "http://localhost:8080". */
     protected final String baseUrl;
 
     protected final LookupQueryCreator lookupQueryCreator;
 
-    protected final int httpRequestTimeOutSeconds;
+    protected final Duration httpRequestTimeout;
 
     /** HTTP headers that should be used for {@link HttpRequest} created by factory. */
     private final String[] headersAndValues;
@@ -80,18 +78,17 @@ public abstract class RequestFactoryBase implements HttpRequestFactory {
 
         this.headersAndValues = HttpHeaderUtils.toHeaderAndValueArray(headerMap);
 
-        this.httpRequestTimeOutSeconds =
-                Integer.parseInt(
-                        options.getProperties()
-                                .getProperty(
-                                        HttpConnectorConfigConstants.LOOKUP_HTTP_TIMEOUT_SECONDS,
-                                        DEFAULT_REQUEST_TIMEOUT_SECONDS));
+        var readableConfig = options.getReadableConfig();
+        this.httpRequestTimeout =
+                readableConfig != null
+                        ? readableConfig.get(
+                                HttpLookupConnectorOptions.SOURCE_LOOKUP_REQUEST_TIMEOUT)
+                        : HttpLookupConnectorOptions.SOURCE_LOOKUP_REQUEST_TIMEOUT.defaultValue();
 
-        String httpVersionFromConfig = null;
-        if (options.getReadableConfig() != null) {
-            httpVersionFromConfig =
-                    options.getReadableConfig().get(HttpLookupConnectorOptions.LOOKUP_HTTP_VERSION);
-        }
+        String httpVersionFromConfig =
+                readableConfig != null
+                        ? readableConfig.get(HttpLookupConnectorOptions.LOOKUP_HTTP_VERSION)
+                        : null;
         if (httpVersionFromConfig == null) {
             httpVersion = null;
         } else {
@@ -122,9 +119,7 @@ public abstract class RequestFactoryBase implements HttpRequestFactory {
      * @return {@link Builder} for given lookupQuery.
      */
     protected Builder setUpRequestMethod(LookupQueryInfo lookupQuery) {
-        HttpRequest.Builder builder =
-                HttpRequest.newBuilder()
-                        .timeout(Duration.ofSeconds(this.httpRequestTimeOutSeconds));
+        HttpRequest.Builder builder = HttpRequest.newBuilder().timeout(this.httpRequestTimeout);
         return httpVersion == null ? builder : builder.version(httpVersion);
     }
 

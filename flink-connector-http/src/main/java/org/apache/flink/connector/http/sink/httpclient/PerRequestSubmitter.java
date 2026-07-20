@@ -27,7 +27,6 @@ import java.net.http.HttpClient.Version;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -79,7 +78,7 @@ public class PerRequestSubmitter extends AbstractRequestSubmitter {
                 java.net.http.HttpRequest.newBuilder()
                         .uri(endpointUri)
                         .version(Version.HTTP_1_1)
-                        .timeout(Duration.ofSeconds(httpRequestTimeOutSeconds))
+                        .timeout(httpRequestTimeout)
                         .method(
                                 requestEntry.method,
                                 BodyPublishers.ofByteArray(requestEntry.element));

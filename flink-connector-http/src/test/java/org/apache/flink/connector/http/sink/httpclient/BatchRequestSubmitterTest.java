@@ -21,6 +21,7 @@ package org.apache.flink.connector.http.sink.httpclient;
 import org.apache.flink.connector.http.config.HttpConnectorConfigConstants;
 import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -30,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -69,6 +72,35 @@ class BatchRequestSubmitterTest {
                         .collect(Collectors.toList()));
 
         verify(mockHttpClient, times(expectedNumberOfBatchRequests)).sendAsync(any(), any());
+    }
+
+    /**
+     * The sink shares the same latent defect as FLINK-39364 (#31): {@code
+     * http.sink.request.timeout} was declared as a {@code durationType()} option but read with
+     * {@code Integer.parseInt(...)}, so a unit-suffixed value like {@code "45s"} threw {@link
+     * NumberFormatException}. It must now be parsed as a real {@link Duration}.
+     */
+    @Test
+    public void requestTimeoutWithUnitIsParsedAsDuration() {
+        Properties properties = new Properties();
+        properties.setProperty(HttpConnectorConfigConstants.SINK_HTTP_BATCH_REQUEST_SIZE, "50");
+        properties.setProperty(HttpConnectorConfigConstants.SINK_HTTP_TIMEOUT_SECONDS, "45s");
+
+        BatchRequestSubmitter submitter =
+                new BatchRequestSubmitter(properties, new String[0], mockHttpClient);
+
+        assertThat(submitter.httpRequestTimeout).isEqualTo(Duration.ofSeconds(45));
+    }
+
+    @Test
+    public void requestTimeoutDefaultsToThirtySeconds() {
+        Properties properties = new Properties();
+        properties.setProperty(HttpConnectorConfigConstants.SINK_HTTP_BATCH_REQUEST_SIZE, "50");
+
+        BatchRequestSubmitter submitter =
+                new BatchRequestSubmitter(properties, new String[0], mockHttpClient);
+
+        assertThat(submitter.httpRequestTimeout).isEqualTo(Duration.ofSeconds(30));
     }
 
     private static Stream<Arguments> httpRequestMethods() {

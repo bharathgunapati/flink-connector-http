@@ -25,7 +25,9 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 /**
  * Unfortunately it seems that Flink is lazy with connector instantiation, so one has to call INSERT
@@ -125,9 +127,14 @@ public class HttpDynamicTableSinkFactoryTest {
                         "http://localhost/",
                         HttpDynamicSinkConnectorOptions.SINK_REQUEST_TIMEOUT.key());
         tEnv.executeSql(withRequestTimeout);
-        // Should not throw ValidationException for the option itself
-        // (a RuntimeException for actual HTTP calls is fine in test)
-        assertThatThrownBy(() -> tEnv.executeSql("INSERT INTO httpTimeout VALUES (1)").await())
-                .isNotInstanceOf(org.apache.flink.table.api.ValidationException.class);
+        // The duration-typed option must be recognized at DDL time; INSERT may fail at runtime
+        // (e.g. no HTTP server) but must not raise ValidationException.
+        Throwable insertFailure =
+                catchThrowable(() -> tEnv.executeSql("INSERT INTO httpTimeout VALUES (1)").await());
+        if (insertFailure != null) {
+            assertThat(insertFailure)
+                    .as("request.timeout must be a recognized option")
+                    .isNotInstanceOf(ValidationException.class);
+        }
     }
 }
