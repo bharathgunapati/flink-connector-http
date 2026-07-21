@@ -43,7 +43,6 @@ import org.apache.flink.table.types.DataType;
 
 import javax.annotation.Nullable;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -134,11 +133,6 @@ public class HttpLookupTableSourceFactory implements DynamicTableSourceFactory {
                 decodingFormat,
                 dynamicTableContext,
                 getLookupCache(readable));
-    }
-
-    protected void validateHttpLookupSourceOptions(ReadableConfig tableOptions)
-            throws IllegalArgumentException {
-        validateHttpLookupSourceOptions(tableOptions, Collections.emptyMap());
     }
 
     protected void validateHttpLookupSourceOptions(

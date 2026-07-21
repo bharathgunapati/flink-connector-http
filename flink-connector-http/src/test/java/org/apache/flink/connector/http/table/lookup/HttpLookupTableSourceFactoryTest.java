@@ -72,12 +72,14 @@ public class HttpLookupTableSourceFactoryTest {
         HttpLookupTableSourceFactory httpLookupTableSourceFactory =
                 new HttpLookupTableSourceFactory();
         TableConfig tableConfig = TableConfig.getDefault();
-        httpLookupTableSourceFactory.validateHttpLookupSourceOptions(tableConfig);
+        httpLookupTableSourceFactory.validateHttpLookupSourceOptions(
+                tableConfig, Collections.emptyMap());
         tableConfig.set(
                 HttpLookupConnectorOptions.SOURCE_LOOKUP_OIDC_AUTH_TOKEN_ENDPOINT_URL, "aaa");
 
         try {
-            httpLookupTableSourceFactory.validateHttpLookupSourceOptions(tableConfig);
+            httpLookupTableSourceFactory.validateHttpLookupSourceOptions(
+                    tableConfig, Collections.emptyMap());
             fail("Expected an error.");
         } catch (IllegalArgumentException e) {
             // expected
@@ -85,7 +87,8 @@ public class HttpLookupTableSourceFactoryTest {
         // should now work.
         tableConfig.set(HttpLookupConnectorOptions.SOURCE_LOOKUP_OIDC_AUTH_TOKEN_REQUEST, "bbb");
 
-        httpLookupTableSourceFactory.validateHttpLookupSourceOptions(tableConfig);
+        httpLookupTableSourceFactory.validateHttpLookupSourceOptions(
+                tableConfig, Collections.emptyMap());
     }
 
     @Test
