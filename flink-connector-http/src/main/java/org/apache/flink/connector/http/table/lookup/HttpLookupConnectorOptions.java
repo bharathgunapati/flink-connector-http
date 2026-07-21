@@ -63,11 +63,19 @@ public class HttpLookupConnectorOptions {
                     .noDefaultValue()
                     .withDescription("The arguments that should be used for HTTP GET Request.");
 
+    /**
+     * Legacy DDL key; still accepted. Prefer {@link #ASYNC_POLLING} key {@code async-polling}.
+     * Flink's {@code withDeprecatedKeys} emits a WARN log at runtime when this key is used; that
+     * warning is intentional and expected, not a bug.
+     */
+    public static final String DEPRECATED_ASYNC_POLLING_KEY = "asyncPolling";
+
     public static final ConfigOption<Boolean> ASYNC_POLLING =
-            ConfigOptions.key("asyncPolling")
+            ConfigOptions.key("async-polling")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription("Whether to use Sync and Async polling mechanism");
+                    .withDeprecatedKeys(DEPRECATED_ASYNC_POLLING_KEY)
+                    .withDescription("Whether to use sync or async polling mechanism.");
 
     public static final ConfigOption<String> LOOKUP_METHOD =
             ConfigOptions.key("lookup-method")

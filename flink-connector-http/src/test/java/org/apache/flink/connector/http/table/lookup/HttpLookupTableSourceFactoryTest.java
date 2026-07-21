@@ -28,6 +28,8 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -70,12 +72,14 @@ public class HttpLookupTableSourceFactoryTest {
         HttpLookupTableSourceFactory httpLookupTableSourceFactory =
                 new HttpLookupTableSourceFactory();
         TableConfig tableConfig = TableConfig.getDefault();
-        httpLookupTableSourceFactory.validateHttpLookupSourceOptions(tableConfig);
+        httpLookupTableSourceFactory.validateHttpLookupSourceOptions(
+                tableConfig, Collections.emptyMap());
         tableConfig.set(
                 HttpLookupConnectorOptions.SOURCE_LOOKUP_OIDC_AUTH_TOKEN_ENDPOINT_URL, "aaa");
 
         try {
-            httpLookupTableSourceFactory.validateHttpLookupSourceOptions(tableConfig);
+            httpLookupTableSourceFactory.validateHttpLookupSourceOptions(
+                    tableConfig, Collections.emptyMap());
             fail("Expected an error.");
         } catch (IllegalArgumentException e) {
             // expected
@@ -83,7 +87,8 @@ public class HttpLookupTableSourceFactoryTest {
         // should now work.
         tableConfig.set(HttpLookupConnectorOptions.SOURCE_LOOKUP_OIDC_AUTH_TOKEN_REQUEST, "bbb");
 
-        httpLookupTableSourceFactory.validateHttpLookupSourceOptions(tableConfig);
+        httpLookupTableSourceFactory.validateHttpLookupSourceOptions(
+                tableConfig, Collections.emptyMap());
     }
 
     @Test
@@ -137,6 +142,22 @@ public class HttpLookupTableSourceFactoryTest {
         DynamicTableSource source = createTableSource(SCHEMA, options);
         assertThat(source).isNotNull();
         assertThat(source).isInstanceOf(HttpLookupTableSource.class);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"async-polling", "asyncPolling"})
+    void shouldAcceptAsyncPollingAtFactory(String asyncOptionKey) {
+        Map<String, String> options = getOptions(Map.of(asyncOptionKey, "true"));
+        DynamicTableSource source = createTableSource(SCHEMA, options);
+        assertThat(source).isInstanceOf(HttpLookupTableSource.class);
+    }
+
+    @Test
+    void shouldRejectBothAsyncPollingKeys() {
+        Map<String, String> options =
+                getOptions(Map.of("async-polling", "true", "asyncPolling", "false"));
+        assertThatExceptionOfType(ValidationException.class)
+                .isThrownBy(() -> createTableSource(SCHEMA, options));
     }
 
     private Map<String, String> getMandatoryOptions() {

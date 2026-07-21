@@ -42,6 +42,7 @@ import org.apache.flink.table.types.logical.IntType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
@@ -220,10 +221,12 @@ class HttpLookupTableSourceTest {
                 .isNotNull();
     }
 
-    @Test
+    @ParameterizedTest
+    @CsvSource({"async-polling", "asyncPolling"})
     @SuppressWarnings("unchecked")
-    void shouldCreateAsyncTableSourceWithParams() {
-        Map<String, String> options = getOptionsWithAsync();
+    void shouldCreateAsyncTableSourceWithAsyncPollingKey(String asyncOptionKey) {
+        Map<String, String> options = new HashMap<>(getOptions());
+        options.put(asyncOptionKey, "true");
 
         HttpLookupTableSource tableSource =
                 (HttpLookupTableSource) createTableSource(SCHEMA, options);
@@ -334,13 +337,6 @@ class HttpLookupTableSourceTest {
         LookupTableSource.LookupContext lookupContext =
                 new LookupRuntimeProviderContext(lookupKeys, false);
         return tableSource.getLookupRuntimeProvider(null, null, null);
-    }
-
-    private Map<String, String> getOptionsWithAsync() {
-        Map<String, String> options = getOptions();
-        options = new HashMap<>(options);
-        options.put("asyncPolling", "true");
-        return options;
     }
 
     private Map<String, String> getOptions() {
