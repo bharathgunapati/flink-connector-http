@@ -183,6 +183,55 @@ class JavaNetSinkHttpClientTest {
                 .containsExactlyInAnyOrder(successfulEntry, ignoredEntry);
         assertThat(response.getFailedRequests()).containsExactly(retryableEntry);
         assertThat(response.getFatalFailedRequests()).containsExactly(fatalEntry);
+        assertThat(response.getIgnoredRequests()).containsExactly(ignoredEntry);
+        assertThat(response.getExceptionFailedRequests()).isEmpty();
+        assertThat(response.getStatusCodeCounts())
+                .containsEntry(200, 1)
+                .containsEntry(500, 1)
+                .containsEntry(400, 1)
+                .containsEntry(404, 1);
+        assertThat(response.getHttpRequestCount()).isEqualTo(4);
+    }
+
+    @Test
+    public void shouldExposeRequestsFailedBeforeReceivingResponse() {
+        HttpSinkRequestEntry exceptionEntry = new HttpSinkRequestEntry("POST", new byte[] {1});
+
+        RequestSubmitterFactory submitterFactory =
+                (_sinkConfig, _headersAndValues) ->
+                        (_endpointUrl, _requestToSubmit) ->
+                                List.of(nullResponseFuture(exceptionEntry));
+
+        Properties properties = new Properties();
+        properties.setProperty(SINK_MAX_RETRIES, "0");
+        JavaNetSinkHttpClient client =
+                new JavaNetSinkHttpClient(
+                        sinkConfig(properties), headerPreprocessor, submitterFactory);
+
+        var response = client.putRequests(List.of(exceptionEntry), "http://localhost").join();
+
+        assertThat(response.getFailedRequests()).containsExactly(exceptionEntry);
+        assertThat(response.getExceptionFailedRequests()).containsExactly(exceptionEntry);
+        assertThat(response.getStatusCodeCounts()).isEmpty();
+        assertThat(response.getHttpRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    public void shouldExposeRequestLatencySamples() {
+        HttpSinkRequestEntry entry = new HttpSinkRequestEntry("POST", new byte[] {1});
+
+        RequestSubmitterFactory submitterFactory =
+                (_sinkConfig, _headersAndValues) ->
+                        (_endpointUrl, _requestToSubmit) -> List.of(responseFuture(entry, 200, 42));
+
+        JavaNetSinkHttpClient client =
+                new JavaNetSinkHttpClient(
+                        sinkConfig(new Properties()), headerPreprocessor, submitterFactory);
+
+        var response = client.putRequests(List.of(entry), "http://localhost").join();
+
+        assertThat(response.getHttpRequestCount()).isEqualTo(1);
+        assertThat(response.getRequestLatenciesMillis()).containsExactly(42L);
     }
 
     @Test
@@ -338,6 +387,16 @@ class JavaNetSinkHttpClientTest {
 
     private static CompletableFuture<JavaNetHttpResponseWrapper> responseFuture(
             List<HttpSinkRequestEntry> requestEntries, int statusCode) {
+        return responseFuture(requestEntries, statusCode, -1);
+    }
+
+    private static CompletableFuture<JavaNetHttpResponseWrapper> responseFuture(
+            HttpSinkRequestEntry requestEntry, int statusCode, long requestLatencyMillis) {
+        return responseFuture(List.of(requestEntry), statusCode, requestLatencyMillis);
+    }
+
+    private static CompletableFuture<JavaNetHttpResponseWrapper> responseFuture(
+            List<HttpSinkRequestEntry> requestEntries, int statusCode, long requestLatencyMillis) {
         HttpRequest request =
                 new HttpRequest(
                         java.net.http.HttpRequest.newBuilder(
@@ -353,6 +412,23 @@ class JavaNetSinkHttpClientTest {
                         requestEntries);
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(statusCode);
-        return CompletableFuture.completedFuture(new JavaNetHttpResponseWrapper(request, response));
+        return CompletableFuture.completedFuture(
+                new JavaNetHttpResponseWrapper(request, response, requestLatencyMillis));
+    }
+
+    private static CompletableFuture<JavaNetHttpResponseWrapper> nullResponseFuture(
+            HttpSinkRequestEntry requestEntry) {
+        HttpRequest request =
+                new HttpRequest(
+                        java.net.http.HttpRequest.newBuilder(
+                                        java.net.URI.create("http://localhost"))
+                                .method(
+                                        requestEntry.method,
+                                        java.net.http.HttpRequest.BodyPublishers.noBody())
+                                .build(),
+                        List.of(requestEntry.element),
+                        requestEntry.method,
+                        List.of(requestEntry));
+        return CompletableFuture.completedFuture(new JavaNetHttpResponseWrapper(request, null));
     }
 }

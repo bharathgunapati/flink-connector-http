@@ -20,7 +20,9 @@ package org.apache.flink.connector.http.sink.httpclient;
 import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Result of one HTTP sink client submission attempt. */
 class HttpSinkAttemptResult {
@@ -30,6 +32,16 @@ class HttpSinkAttemptResult {
     private final List<HttpSinkRequestEntry> retryableRequests = new ArrayList<>();
 
     private final List<HttpSinkRequestEntry> fatalFailedRequests = new ArrayList<>();
+
+    private final List<HttpSinkRequestEntry> ignoredRequests = new ArrayList<>();
+
+    private final List<HttpSinkRequestEntry> exceptionFailedRequests = new ArrayList<>();
+
+    private final Map<Integer, Integer> statusCodeCounts = new HashMap<>();
+
+    private final List<Long> requestLatenciesMillis = new ArrayList<>();
+
+    private int httpRequestCount;
 
     void addSuccessfulRequests(List<HttpSinkRequestEntry> requestEntries) {
         successfulRequests.addAll(requestEntries);
@@ -43,6 +55,26 @@ class HttpSinkAttemptResult {
         fatalFailedRequests.addAll(requestEntries);
     }
 
+    void addIgnoredRequests(List<HttpSinkRequestEntry> requestEntries) {
+        ignoredRequests.addAll(requestEntries);
+    }
+
+    void addExceptionFailedRequests(List<HttpSinkRequestEntry> requestEntries) {
+        exceptionFailedRequests.addAll(requestEntries);
+    }
+
+    void incrementStatusCodeCount(int statusCode, int count) {
+        statusCodeCounts.merge(statusCode, count, Integer::sum);
+    }
+
+    void addRequestLatencyMillis(long requestLatencyMillis) {
+        requestLatenciesMillis.add(requestLatencyMillis);
+    }
+
+    void incrementHttpRequestCount() {
+        httpRequestCount++;
+    }
+
     List<HttpSinkRequestEntry> getSuccessfulRequests() {
         return successfulRequests;
     }
@@ -53,6 +85,26 @@ class HttpSinkAttemptResult {
 
     List<HttpSinkRequestEntry> getFatalFailedRequests() {
         return fatalFailedRequests;
+    }
+
+    List<HttpSinkRequestEntry> getIgnoredRequests() {
+        return ignoredRequests;
+    }
+
+    List<HttpSinkRequestEntry> getExceptionFailedRequests() {
+        return exceptionFailedRequests;
+    }
+
+    Map<Integer, Integer> getStatusCodeCounts() {
+        return statusCodeCounts;
+    }
+
+    List<Long> getRequestLatenciesMillis() {
+        return requestLatenciesMillis;
+    }
+
+    int getHttpRequestCount() {
+        return httpRequestCount;
     }
 
     boolean hasRetryableRequests() {

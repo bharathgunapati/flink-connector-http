@@ -62,6 +62,7 @@ The HTTP source connector supports [Lookup Joins](https://nightlies.apache.org/f
     * [Sink Connector Options](#sink-connector-options)
     * [Sink table HTTP status codes](#sink-table-http-status-codes)
     * [Retries and handling errors (Sink)](#retries-and-handling-errors-sink)
+    * [Sink failure observability](#sink-failure-observability)
     * [Request submission](#request-submission)
     * [Batch submission mode](#batch-submission-mode)
     * [Single submission mode](#single-submission-mode)
@@ -647,6 +648,32 @@ When retries are exhausted, the sink fails the job. Set `http.sink.max-retries` 
 In batch submission mode, one HTTP response represents all records included in the submitted HTTP batch. A retryable batch
 response retries every entry in that batch; a fatal response or exhausted retry limit fails the batch as a unit.
 
+### Sink failure observability
+The HTTP sink increments Flink's standard `numRecordsSendErrors` counter when request entries fail.
+It also registers sink-specific counters under the `http_sink_connector` metric group:
+
+| Metric | Description |
+|--------|-------------|
+| numHttpRequests | Number of actual HTTP requests completed by the sink client. |
+| numRetryableResponseFailures | Number of request entries that received a retryable HTTP response status. |
+| numFatalResponseFailures | Number of request entries that received a fatal HTTP response status. |
+| numIgnoredResponses | Number of request entries whose HTTP response status was ignored and treated as successful. |
+| numRetryExhausted | Number of request entries that failed after exhausting retries. |
+| numRequestExceptions | Number of request entries that failed before receiving an HTTP response. |
+| numRetryAttempts | Number of request entries scheduled for another retry attempt. |
+| requestLatencyMs | Histogram of actual HTTP request durations in milliseconds. |
+
+The sink also registers status-code counters under the `http_sink_connector.status_code` metric
+group. Each counter is named after the HTTP status code and is incremented by the number of request
+entries affected by that response. For example, a batched request containing 50 entries that receives
+HTTP 500 increments the `500` status-code counter by 50.
+
+`numHttpRequests` and `requestLatencyMs` are measured per actual HTTP request. In single submission
+mode this usually maps to one sink entry. In batch submission mode one HTTP request can contain many
+sink entries.
+
+Failure logs include the endpoint, affected request-entry count, and, where available, the response
+status and HTTP method.
 
 ### Request submission
 HTTP Sink by default submits events in batch. The submission mode can be changed using `http.sink.writer.request.mode` property using `single` or `batch` as property value.

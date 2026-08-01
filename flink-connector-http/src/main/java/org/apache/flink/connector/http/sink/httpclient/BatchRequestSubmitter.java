@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This implementation groups received events in batches and submits each batch as individual HTTP
@@ -105,6 +106,7 @@ public class BatchRequestSubmitter extends AbstractRequestSubmitter {
             String endpointUrl, List<HttpSinkRequestEntry> requestBatch) {
 
         HttpRequest httpRequest = buildHttpRequest(requestBatch, URI.create(endpointUrl));
+        long startNanos = System.nanoTime();
         return httpClient
                 .sendAsync(httpRequest.getHttpRequest(), HttpResponse.BodyHandlers.ofString())
                 .exceptionally(
@@ -115,7 +117,12 @@ public class BatchRequestSubmitter extends AbstractRequestSubmitter {
                             return null;
                         })
                 .thenApplyAsync(
-                        res -> new JavaNetHttpResponseWrapper(httpRequest, res),
+                        res ->
+                                new JavaNetHttpResponseWrapper(
+                                        httpRequest,
+                                        res,
+                                        TimeUnit.NANOSECONDS.toMillis(
+                                                System.nanoTime() - startNanos)),
                         publishingThreadPool);
     }
 
