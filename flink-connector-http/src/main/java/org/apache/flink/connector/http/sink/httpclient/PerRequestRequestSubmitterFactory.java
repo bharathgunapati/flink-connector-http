@@ -45,8 +45,7 @@ public class PerRequestRequestSubmitterFactory implements RequestSubmitterFactor
         return new PerRequestSubmitter(
                 sinkConfig,
                 headersAndValues,
-                JavaNetHttpClientFactory.createClient(
-                        sinkConfig.getProperties(), httpClientExecutor),
+                JavaNetHttpClientFactory.createClient(sinkConfig, httpClientExecutor),
                 httpClientExecutor);
     }
 }
