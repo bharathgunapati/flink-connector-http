@@ -63,6 +63,7 @@ import java.util.stream.IntStream;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.any;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.serverError;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
@@ -205,7 +206,7 @@ public class HttpSinkConnectionTest {
                                 (s, _context) ->
                                         new HttpSinkRequestEntry(
                                                 "POST", s.getBytes(StandardCharsets.UTF_8)))
-                        .setSinkHttpClientBuilder(JavaNetSinkHttpClient::new)
+                        .setSinkHttpClientBuilder(JavaNetSinkHttpClient.builder())
                         .setProperty(
                                 HttpConnectorConfigConstants.SINK_HEADER_PREFIX + "Content-Type",
                                 contentTypeHeader)
@@ -250,18 +251,22 @@ public class HttpSinkConnectionTest {
                                 (s, _context) ->
                                         new HttpSinkRequestEntry(
                                                 "POST", s.getBytes(StandardCharsets.UTF_8)))
-                        .setSinkHttpClientBuilder(JavaNetSinkHttpClient::new)
+                        .setSinkHttpClientBuilder(JavaNetSinkHttpClient.builder())
+                        .setProperty(
+                                HttpConnectorConfigConstants.SINK_HEADER_PREFIX + "Content-Type",
+                                "application/json")
+                        .setProperty(
+                                HttpConnectorConfigConstants.SINK_RETRY_FIXED_DELAY_DELAY, "1ms")
                         .build();
         source.sinkTo(httpSink);
         env.execute("Http Sink test failed connection");
 
-        assertThat(SendErrorsTestReporterFactory.getCount()).isEqualTo(1);
-        // TODO: reintroduce along with the retries
-        //  var postedRequests = wireMockServer
-        //  .findAll(postRequestedFor(urlPathEqualTo("/myendpoint")));
-        //  assertThat(postedRequests).hasSize(2);
-        //  assertThat(postedRequests.get(0).getBodyAsString())
-        //      .isEqualTo(postedRequests.get(1).getBodyAsString());
+        assertThat(SendErrorsTestReporterFactory.getCount()).isZero();
+        var postedRequests =
+                wireMockServer.findAll(postRequestedFor(urlPathEqualTo("/myendpoint")));
+        assertThat(postedRequests).hasSize(2);
+        assertThat(postedRequests.get(0).getBodyAsString())
+                .isEqualTo(postedRequests.get(1).getBodyAsString());
     }
 
     @Test
@@ -290,17 +295,22 @@ public class HttpSinkConnectionTest {
                                 (s, _context) ->
                                         new HttpSinkRequestEntry(
                                                 "POST", s.getBytes(StandardCharsets.UTF_8)))
-                        .setSinkHttpClientBuilder(JavaNetSinkHttpClient::new)
+                        .setSinkHttpClientBuilder(JavaNetSinkHttpClient.builder())
+                        .setProperty(
+                                HttpConnectorConfigConstants.SINK_HEADER_PREFIX + "Content-Type",
+                                "application/json")
+                        .setProperty(
+                                HttpConnectorConfigConstants.SINK_RETRY_FIXED_DELAY_DELAY, "1ms")
                         .build();
         source.sinkTo(httpSink);
         env.execute("Http Sink test failed connection");
 
-        assertThat(SendErrorsTestReporterFactory.getCount()).isEqualTo(1);
-        // var postedRequests = wireMockServer
-        // .findAll(postRequestedFor(urlPathEqualTo("/myendpoint")));
-        // assertThat(postedRequests).hasSize(2);
-        // assertThat(postedRequests.get(0).getBodyAsString())
-        //     .isEqualTo(postedRequests.get(1).getBodyAsString());
+        assertThat(SendErrorsTestReporterFactory.getCount()).isZero();
+        var postedRequests =
+                wireMockServer.findAll(postRequestedFor(urlPathEqualTo("/myendpoint")));
+        assertThat(postedRequests).hasSize(2);
+        assertThat(postedRequests.get(0).getBodyAsString())
+                .isEqualTo(postedRequests.get(1).getBodyAsString());
     }
 
     @Test
@@ -318,7 +328,10 @@ public class HttpSinkConnectionTest {
                                 (s, _context) ->
                                         new HttpSinkRequestEntry(
                                                 "POST", s.getBytes(StandardCharsets.UTF_8)))
-                        .setSinkHttpClientBuilder(JavaNetSinkHttpClient::new)
+                        .setSinkHttpClientBuilder(JavaNetSinkHttpClient.builder())
+                        .setProperty(
+                                HttpConnectorConfigConstants.SINK_HEADER_PREFIX + "Content-Type",
+                                "application/json")
                         .setProperty("http.sink.error.code.exclude", "404, 405")
                         .setProperty("http.sink.error.code", "4XX")
                         .build();

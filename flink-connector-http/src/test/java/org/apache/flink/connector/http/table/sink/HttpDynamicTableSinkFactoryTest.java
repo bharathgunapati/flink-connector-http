@@ -110,6 +110,26 @@ public class HttpDynamicTableSinkFactoryTest {
     }
 
     @Test
+    public void validateWriterThreadPoolSizeTest() {
+        final String invalidThreadPoolSize =
+                String.format(
+                        "CREATE TABLE http (\n"
+                                + "  id bigint\n"
+                                + ") with (\n"
+                                + "  'connector' = '%s',\n"
+                                + "  'url' = '%s',\n"
+                                + "  'format' = 'json',\n"
+                                + "  '%s' = '0'\n"
+                                + ")",
+                        HttpDynamicTableSinkFactory.IDENTIFIER,
+                        "http://localhost/",
+                        HttpDynamicSinkConnectorOptions.SINK_WRITER_THREAD_POOL_SIZE.key());
+        tEnv.executeSql(invalidThreadPoolSize);
+        assertThatThrownBy(() -> tEnv.executeSql("INSERT INTO http VALUES (1)").await())
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
     public void requestTimeoutOptionTest() {
         // Verify that http.sink.request.timeout is a valid recognized option (no
         // ValidationException)
@@ -136,5 +156,154 @@ public class HttpDynamicTableSinkFactoryTest {
                     .as("request.timeout must be a recognized option")
                     .isNotInstanceOf(ValidationException.class);
         }
+    }
+
+    @Test
+    public void validateMaxRetriesTest() {
+        final String invalidMaxRetries =
+                String.format(
+                        "CREATE TABLE httpRetries (\n"
+                                + "  id bigint\n"
+                                + ") with (\n"
+                                + "  'connector' = '%s',\n"
+                                + "  'url' = '%s',\n"
+                                + "  'format' = 'json',\n"
+                                + "  '%s' = '-1'\n"
+                                + ")",
+                        HttpDynamicTableSinkFactory.IDENTIFIER,
+                        "http://localhost/",
+                        HttpDynamicSinkConnectorOptions.SINK_MAX_RETRIES.key());
+        tEnv.executeSql(invalidMaxRetries);
+        assertThatThrownBy(() -> tEnv.executeSql("INSERT INTO httpRetries VALUES (1)").await())
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    public void validateSinkStatusCodeOptionsTest() {
+        final String overlappingStatusCodes =
+                String.format(
+                        "CREATE TABLE httpStatusCodes (\n"
+                                + "  id bigint\n"
+                                + ") with (\n"
+                                + "  'connector' = '%s',\n"
+                                + "  'url' = '%s',\n"
+                                + "  'format' = 'json',\n"
+                                + "  '%s' = '2XX,500',\n"
+                                + "  '%s' = '500'\n"
+                                + ")",
+                        HttpDynamicTableSinkFactory.IDENTIFIER,
+                        "http://localhost/",
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_SUCCESS_CODES.key(),
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_RETRY_CODES.key());
+        tEnv.executeSql(overlappingStatusCodes);
+        assertThatThrownBy(() -> tEnv.executeSql("INSERT INTO httpStatusCodes VALUES (1)").await())
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    public void validateRetryFixedDelayDurationTest() {
+        assertInvalidRetryOption(
+                "httpFixedDelay",
+                String.format(
+                        "  '%s' = '0s'\n",
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_FIXED_DELAY_DELAY.key()));
+    }
+
+    @Test
+    public void validateRetryExponentialInitialBackoffDurationTest() {
+        assertInvalidRetryOption(
+                "httpInitialBackoff",
+                String.format(
+                        "  '%s' = '0s'\n",
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_EXPONENTIAL_DELAY_INITIAL_BACKOFF
+                                .key()));
+    }
+
+    @Test
+    public void validateRetryExponentialMaxBackoffDurationTest() {
+        assertInvalidRetryOption(
+                "httpMaxBackoff",
+                String.format(
+                        "  '%s' = '0s'\n",
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_EXPONENTIAL_DELAY_MAX_BACKOFF
+                                .key()));
+    }
+
+    @Test
+    public void validateRetryExponentialMaxBackoffRangeTest() {
+        assertInvalidRetryOption(
+                "httpBackoffRange",
+                String.format(
+                        "  '%s' = '10s',\n" + "  '%s' = '1s'\n",
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_EXPONENTIAL_DELAY_INITIAL_BACKOFF
+                                .key(),
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_EXPONENTIAL_DELAY_MAX_BACKOFF
+                                .key()));
+    }
+
+    @Test
+    public void acceptsSinkRetryAndStatusCodeOptionsTest() {
+        final String retryOptions =
+                String.format(
+                        "CREATE TABLE httpRetryOptions (\n"
+                                + "  id bigint\n"
+                                + ") with (\n"
+                                + "  'connector' = '%s',\n"
+                                + "  'url' = '%s',\n"
+                                + "  'format' = 'json',\n"
+                                + "  '%s' = '2',\n"
+                                + "  '%s' = '2XX',\n"
+                                + "  '%s' = '500,503',\n"
+                                + "  '%s' = '404',\n"
+                                + "  '%s' = 'exponential-delay',\n"
+                                + "  '%s' = '1s',\n"
+                                + "  '%s' = '1s',\n"
+                                + "  '%s' = '30s',\n"
+                                + "  '%s' = '2.0'\n"
+                                + ")",
+                        HttpDynamicTableSinkFactory.IDENTIFIER,
+                        "http://localhost/",
+                        HttpDynamicSinkConnectorOptions.SINK_MAX_RETRIES.key(),
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_SUCCESS_CODES.key(),
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_RETRY_CODES.key(),
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_IGNORED_RESPONSE_CODES.key(),
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_STRATEGY.key(),
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_FIXED_DELAY_DELAY.key(),
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_EXPONENTIAL_DELAY_INITIAL_BACKOFF
+                                .key(),
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_EXPONENTIAL_DELAY_MAX_BACKOFF
+                                .key(),
+                        HttpDynamicSinkConnectorOptions.SINK_RETRY_EXPONENTIAL_DELAY_MULTIPLIER
+                                .key());
+        tEnv.executeSql(retryOptions);
+        Throwable insertFailure =
+                catchThrowable(
+                        () -> tEnv.executeSql("INSERT INTO httpRetryOptions VALUES (1)").await());
+        if (insertFailure != null) {
+            assertThat(insertFailure)
+                    .as("sink retry/status options must be recognized")
+                    .isNotInstanceOf(ValidationException.class);
+        }
+    }
+
+    private void assertInvalidRetryOption(String tableName, String retryOptionLine) {
+        final String ddl =
+                String.format(
+                        "CREATE TABLE %s (\n"
+                                + "  id bigint\n"
+                                + ") with (\n"
+                                + "  'connector' = '%s',\n"
+                                + "  'url' = '%s',\n"
+                                + "  'format' = 'json',\n"
+                                + "%s"
+                                + ")",
+                        tableName,
+                        HttpDynamicTableSinkFactory.IDENTIFIER,
+                        "http://localhost/",
+                        retryOptionLine);
+        tEnv.executeSql(ddl);
+        assertThatThrownBy(
+                        () -> tEnv.executeSql("INSERT INTO " + tableName + " VALUES (1)").await())
+                .isInstanceOf(ValidationException.class);
     }
 }

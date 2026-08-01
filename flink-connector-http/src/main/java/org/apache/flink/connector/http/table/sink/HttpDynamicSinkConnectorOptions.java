@@ -19,11 +19,21 @@ package org.apache.flink.connector.http.table.sink;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+import org.apache.flink.connector.http.config.HttpConnectorConfigConstants;
+import org.apache.flink.connector.http.retry.RetryStrategyType;
 
 import java.time.Duration;
 
 import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_HTTP_TIMEOUT_SECONDS;
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_HTTP_WRITER_THREAD_POOL_SIZE;
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_IGNORE_RESPONSE_CODES;
 import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_REQUEST_CALLBACK_IDENTIFIER;
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_RETRY_CODES;
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_RETRY_EXP_DELAY_INITIAL_BACKOFF;
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_RETRY_EXP_DELAY_MAX_BACKOFF;
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_RETRY_EXP_DELAY_MULTIPLIER;
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_RETRY_STRATEGY_TYPE;
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_SUCCESS_CODES;
 
 /** Table API options for {@link HttpDynamicSink}. */
 public class HttpDynamicSinkConnectorOptions {
@@ -58,4 +68,78 @@ public class HttpDynamicSinkConnectorOptions {
             ConfigOptions.key(SINK_REQUEST_CALLBACK_IDENTIFIER)
                     .stringType()
                     .defaultValue(Slf4jHttpPostRequestCallbackFactory.IDENTIFIER);
+
+    /**
+     * Thread pool size for HTTP sink writer response handling. Defaults to 1 thread when not
+     * specified.
+     */
+    public static final ConfigOption<Integer> SINK_WRITER_THREAD_POOL_SIZE =
+            ConfigOptions.key(SINK_HTTP_WRITER_THREAD_POOL_SIZE)
+                    .intType()
+                    .defaultValue(1)
+                    .withDescription(
+                            "Sets the size of the thread pool for HTTP sink request processing.");
+
+    public static final ConfigOption<Integer> SINK_MAX_RETRIES =
+            ConfigOptions.key(HttpConnectorConfigConstants.SINK_MAX_RETRIES)
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "The maximum number of retries for failed HTTP sink requests. "
+                                    + "Set to 0 to disable retries.");
+
+    public static final ConfigOption<String> SINK_HTTP_SUCCESS_CODES =
+            ConfigOptions.key(SINK_SUCCESS_CODES)
+                    .stringType()
+                    .defaultValue("2XX")
+                    .withDescription(
+                            "Comma separated HTTP status codes considered as successful sink responses. "
+                                    + "Use [1-5]XX for groups and '!' for exclusions.");
+
+    public static final ConfigOption<String> SINK_HTTP_RETRY_CODES =
+            ConfigOptions.key(SINK_RETRY_CODES)
+                    .stringType()
+                    .defaultValue("500,503,504")
+                    .withDescription(
+                            "Comma separated HTTP status codes considered as retryable sink responses. "
+                                    + "Use [1-5]XX for groups and '!' for exclusions.");
+
+    public static final ConfigOption<String> SINK_HTTP_IGNORED_RESPONSE_CODES =
+            ConfigOptions.key(SINK_IGNORE_RESPONSE_CODES)
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription(
+                            "Comma separated HTTP status codes that should be treated as successful "
+                                    + "without retrying.");
+
+    public static final ConfigOption<String> SINK_RETRY_STRATEGY =
+            ConfigOptions.key(SINK_RETRY_STRATEGY_TYPE)
+                    .stringType()
+                    .defaultValue(RetryStrategyType.FIXED_DELAY.getCode())
+                    .withDescription(
+                            "HTTP sink retry strategy type: fixed-delay (default) or exponential-delay.");
+
+    public static final ConfigOption<Duration> SINK_RETRY_FIXED_DELAY_DELAY =
+            ConfigOptions.key(HttpConnectorConfigConstants.SINK_RETRY_FIXED_DELAY_DELAY)
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(1))
+                    .withDescription("Fixed-delay interval between HTTP sink retries.");
+
+    public static final ConfigOption<Duration> SINK_RETRY_EXPONENTIAL_DELAY_INITIAL_BACKOFF =
+            ConfigOptions.key(SINK_RETRY_EXP_DELAY_INITIAL_BACKOFF)
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(1))
+                    .withDescription("Exponential-delay initial backoff for HTTP sink retries.");
+
+    public static final ConfigOption<Duration> SINK_RETRY_EXPONENTIAL_DELAY_MAX_BACKOFF =
+            ConfigOptions.key(SINK_RETRY_EXP_DELAY_MAX_BACKOFF)
+                    .durationType()
+                    .defaultValue(Duration.ofMinutes(1))
+                    .withDescription("Exponential-delay maximum backoff for HTTP sink retries.");
+
+    public static final ConfigOption<Double> SINK_RETRY_EXPONENTIAL_DELAY_MULTIPLIER =
+            ConfigOptions.key(SINK_RETRY_EXP_DELAY_MULTIPLIER)
+                    .doubleType()
+                    .defaultValue(1.5)
+                    .withDescription("Exponential-delay backoff multiplier for HTTP sink retries.");
 }

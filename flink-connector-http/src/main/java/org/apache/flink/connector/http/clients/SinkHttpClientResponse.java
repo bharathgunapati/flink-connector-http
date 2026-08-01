@@ -17,8 +17,8 @@
 
 package org.apache.flink.connector.http.clients;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
-import org.apache.flink.connector.http.sink.httpclient.HttpRequest;
 
 import lombok.Data;
 import lombok.NonNull;
@@ -31,12 +31,16 @@ import java.util.List;
  * to write, divided into two lists &mdash; successful and failed ones.
  */
 @Data
+@PublicEvolving
 @ToString
 public class SinkHttpClientResponse {
 
     /** A list of successfully written requests. */
-    @NonNull private final List<HttpRequest> successfulRequests;
+    @NonNull private final List<HttpSinkRequestEntry> successfulRequests;
 
-    /** A list of requests that {@link SinkHttpClient} failed to write. */
-    @NonNull private final List<HttpRequest> failedRequests;
+    /** A list of requests that {@link SinkHttpClient} failed with a retryable failure. */
+    @NonNull private final List<HttpSinkRequestEntry> failedRequests;
+
+    /** A list of requests that {@link SinkHttpClient} failed with a fatal failure. */
+    @NonNull private final List<HttpSinkRequestEntry> fatalFailedRequests;
 }

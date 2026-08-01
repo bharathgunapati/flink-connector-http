@@ -138,6 +138,38 @@ public final class HttpConnectorConfigConstants {
     public static final String SINK_HTTP_WRITER_THREAD_POOL_SIZE =
             FLINK_CONNECTOR_HTTP + "sink.writer.thread-pool.size";
 
+    public static final String SINK_MAX_RETRIES = FLINK_CONNECTOR_HTTP + "sink.max-retries";
+
+    public static final String SINK_SUCCESS_CODES = FLINK_CONNECTOR_HTTP + "sink.success-codes";
+
+    public static final String SINK_RETRY_CODES = FLINK_CONNECTOR_HTTP + "sink.retry-codes";
+
+    public static final String SINK_IGNORE_RESPONSE_CODES =
+            FLINK_CONNECTOR_HTTP + "sink.ignored-response-codes";
+
+    public static final String SINK_RETRY_STRATEGY_PREFIX =
+            FLINK_CONNECTOR_HTTP + "sink.retry-strategy.";
+
+    public static final String SINK_RETRY_STRATEGY_TYPE = SINK_RETRY_STRATEGY_PREFIX + "type";
+
+    private static final String SINK_RETRY_FIXED_DELAY_PREFIX =
+            SINK_RETRY_STRATEGY_PREFIX + "fixed-delay.";
+
+    public static final String SINK_RETRY_FIXED_DELAY_DELAY =
+            SINK_RETRY_FIXED_DELAY_PREFIX + "delay";
+
+    private static final String SINK_RETRY_EXP_DELAY_PREFIX =
+            SINK_RETRY_STRATEGY_PREFIX + "exponential-delay.";
+
+    public static final String SINK_RETRY_EXP_DELAY_INITIAL_BACKOFF =
+            SINK_RETRY_EXP_DELAY_PREFIX + "initial-backoff";
+
+    public static final String SINK_RETRY_EXP_DELAY_MAX_BACKOFF =
+            SINK_RETRY_EXP_DELAY_PREFIX + "max-backoff";
+
+    public static final String SINK_RETRY_EXP_DELAY_MULTIPLIER =
+            SINK_RETRY_EXP_DELAY_PREFIX + "backoff-multiplier";
+
     // -----------------------------------------------------
 
     // ------ Sink request submitter settings ------

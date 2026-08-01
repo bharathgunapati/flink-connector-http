@@ -17,6 +17,7 @@
 
 package org.apache.flink.connector.http.clients;
 
+import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.http.sink.HttpSinkInternal;
 import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
 import org.apache.flink.connector.http.sink.HttpSinkWriter;
@@ -28,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
  * An HTTP client that is used by {@link HttpSinkWriter} to send HTTP requests processed by {@link
  * HttpSinkInternal}.
  */
+@PublicEvolving
 public interface SinkHttpClient {
 
     /**
@@ -40,4 +42,6 @@ public interface SinkHttpClient {
      */
     CompletableFuture<SinkHttpClientResponse> putRequests(
             List<HttpSinkRequestEntry> requestEntries, String endpointUrl);
+
+    default void close() {}
 }
