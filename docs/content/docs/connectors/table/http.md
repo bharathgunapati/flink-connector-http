@@ -61,6 +61,7 @@ The HTTP source connector supports [Lookup Joins](https://nightlies.apache.org/f
     * [HTTP Sink](#http-sink)
     * [Sink Connector Options](#sink-connector-options)
     * [Sink table HTTP status codes](#sink-table-http-status-codes)
+    * [Retries and handling errors (Sink)](#retries-and-handling-errors-sink)
     * [Request submission](#request-submission)
     * [Batch submission mode](#batch-submission-mode)
     * [Single submission mode](#single-submission-mode)
@@ -632,6 +633,16 @@ If either legacy property is set together with `http.sink.success-codes` or `htt
 - `http.sink.success-codes` (default `2XX`) for successful responses
 - `http.sink.retry-codes` (default `500,503,504`) for retryable responses
 - `http.sink.ignored-response-codes` for responses that should be treated as successful without retrying
+
+### Retries and handling errors (Sink)
+HTTP sink retries occur when a request fails with an exception or when the HTTP response status code is listed in
+`http.sink.retry-codes`. Retry delay is controlled by `http.sink.retry-strategy.type` and the matching fixed-delay or
+exponential-delay options.
+
+When retries are exhausted, the sink fails the job. Set `http.sink.max-retries` to `0` to disable retries.
+
+In batch submission mode, one HTTP response represents all records included in the submitted HTTP batch. A retryable batch
+response retries every entry in that batch; a fatal response or exhausted retry limit fails the batch as a unit.
 
 ### Request submission
 HTTP Sink by default submits events in batch. The submission mode can be changed using `http.sink.writer.request.mode` property using `single` or `batch` as property value.

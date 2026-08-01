@@ -82,7 +82,15 @@ These options are specified on the builder using the setProperty method.
 | http.sink.writer.request.mode                             | optional | Sets the Http Sink request submission mode. Two modes are available: `single` and `batch`. Defaults to `batch` if not specified. |
 | http.sink.request.batch.size                              | optional | Applicable only for `http.sink.writer.request.mode = batch`. Sets number of individual events/requests that will be submitted as one HTTP request by HTTP sink. The default value is 500 which is same as HTTP Sink `maxBatchSize` |
 
+### Retries and handling errors (Sink)
+HTTP sink retries occur when a request fails with an exception or when the HTTP response status code is listed in
+`http.sink.retry-codes`. Retry delay is controlled by `http.sink.retry-strategy.type` and the matching fixed-delay or
+exponential-delay options.
 
+When retries are exhausted, the sink fails the job. Set `http.sink.max-retries` to `0` to disable retries.
+
+In batch submission mode, one HTTP response represents all records included in the submitted HTTP batch. A retryable batch
+response retries every entry in that batch; a fatal response or exhausted retry limit fails the batch as a unit.
 
 ### Request submission
 HTTP Sink by default submits events in batch. The submission mode can be changed using `http.sink.writer.request.mode` property using `single` or `batch` as property value.
