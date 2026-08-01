@@ -41,6 +41,9 @@ import java.util.stream.Stream;
 import static org.apache.flink.connector.http.table.lookup.HttpLookupConnectorOptions.SOURCE_LOOKUP_OIDC_AUTH_TOKEN_ENDPOINT_URL;
 import static org.apache.flink.connector.http.table.lookup.HttpLookupConnectorOptions.SOURCE_LOOKUP_OIDC_AUTH_TOKEN_EXPIRY_REDUCTION;
 import static org.apache.flink.connector.http.table.lookup.HttpLookupConnectorOptions.SOURCE_LOOKUP_OIDC_AUTH_TOKEN_REQUEST;
+import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_OIDC_AUTH_TOKEN_ENDPOINT_URL;
+import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_OIDC_AUTH_TOKEN_EXPIRY_REDUCTION;
+import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_OIDC_AUTH_TOKEN_REQUEST;
 
 /** Http header utils. */
 @UtilityClass
@@ -143,6 +146,26 @@ public final class HttpHeaderUtils {
                     HttpHeaderUtils.createOIDCAuthorizationHeaderPreprocessor(
                             oidcAuthURL.get(), oidcTokenRequest.get(), oidcExpiryReduction);
             log.info("created OIDC HeaderPreprocessor");
+        }
+        return headerPreprocessor;
+    }
+
+    public static HeaderPreprocessor createSinkOIDCHeaderPreprocessor(
+            ReadableConfig readableConfig) {
+        HeaderPreprocessor headerPreprocessor = null;
+        Optional<String> oidcAuthURL =
+                readableConfig.getOptional(SINK_OIDC_AUTH_TOKEN_ENDPOINT_URL);
+
+        if (oidcAuthURL.isPresent()) {
+            Optional<String> oidcTokenRequest =
+                    readableConfig.getOptional(SINK_OIDC_AUTH_TOKEN_REQUEST);
+
+            Optional<Duration> oidcExpiryReduction =
+                    readableConfig.getOptional(SINK_OIDC_AUTH_TOKEN_EXPIRY_REDUCTION);
+            headerPreprocessor =
+                    HttpHeaderUtils.createOIDCAuthorizationHeaderPreprocessor(
+                            oidcAuthURL.get(), oidcTokenRequest.get(), oidcExpiryReduction);
+            log.info("created Sink OIDC HeaderPreprocessor");
         }
         return headerPreprocessor;
     }

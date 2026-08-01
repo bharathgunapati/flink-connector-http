@@ -80,7 +80,12 @@ public class JavaNetSinkHttpClient implements SinkHttpClient {
             RequestSubmitterFactory requestSubmitterFactory) {
 
         this.httpPostRequestCallback = sinkConfig.getHttpPostRequestCallback();
-        this.headerMap = sinkConfig.prepareHeaderMap(headerPreprocessor);
+        HeaderPreprocessor effectiveHeaderPreprocessor =
+                HttpHeaderUtils.createSinkOIDCHeaderPreprocessor(sinkConfig.getReadableConfig());
+        if (effectiveHeaderPreprocessor == null) {
+            effectiveHeaderPreprocessor = headerPreprocessor;
+        }
+        this.headerMap = sinkConfig.prepareHeaderMap(effectiveHeaderPreprocessor);
 
         this.responseClassifier = new HttpSinkResponseClassifier(sinkConfig);
 
