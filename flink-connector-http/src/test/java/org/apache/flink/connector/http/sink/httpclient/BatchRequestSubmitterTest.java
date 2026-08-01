@@ -34,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
@@ -47,6 +48,7 @@ import java.util.stream.Stream;
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_REQUEST_TIMEOUT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -177,5 +179,33 @@ class BatchRequestSubmitterTest {
 
         assertThat(httpClientExecutor.isShutdown()).isTrue();
         assertThat(submitter.publishingThreadPool.isShutdown()).isTrue();
+    }
+
+    @Test
+    public void shouldPreserveBatchEntriesInResponseWrapper() {
+        Properties properties = new Properties();
+        properties.setProperty(HttpConnectorConfigConstants.SINK_HTTP_BATCH_REQUEST_SIZE, "50");
+
+        HttpResponse<String> httpResponse = org.mockito.Mockito.mock(HttpResponse.class);
+        doReturn(CompletableFuture.completedFuture(httpResponse))
+                .when(mockHttpClient)
+                .sendAsync(any(), any());
+
+        BatchRequestSubmitter submitter =
+                submitter(
+                        sinkConfig(properties),
+                        mockHttpClient,
+                        Executors.newSingleThreadExecutor());
+        List<HttpSinkRequestEntry> batchEntries =
+                List.of(
+                        new HttpSinkRequestEntry("PUT", new byte[] {1}),
+                        new HttpSinkRequestEntry("PUT", new byte[] {2}),
+                        new HttpSinkRequestEntry("PUT", new byte[] {3}));
+
+        JavaNetHttpResponseWrapper responseWrapper =
+                submitter.submit("http://hello.pl", batchEntries).get(0).join();
+
+        assertThat(responseWrapper.getHttpRequest().getRequestEntries())
+                .containsExactlyElementsOf(batchEntries);
     }
 }

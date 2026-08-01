@@ -46,6 +46,7 @@ import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.connector.http.TestHelper.assertPropertyArray;
@@ -306,19 +307,50 @@ class JavaNetSinkHttpClientTest {
         assertThat(submitterClosed).isTrue();
     }
 
+    @Test
+    public void shouldClassifyBatchResponseForAllBatchEntries() {
+        List<HttpSinkRequestEntry> batchEntries =
+                List.of(
+                        new HttpSinkRequestEntry("POST", new byte[] {1}),
+                        new HttpSinkRequestEntry("POST", new byte[] {2}),
+                        new HttpSinkRequestEntry("POST", new byte[] {3}));
+
+        RequestSubmitterFactory submitterFactory =
+                (_sinkConfig, _headersAndValues) ->
+                        (_endpointUrl, _requestToSubmit) ->
+                                List.of(responseFuture(batchEntries, 500));
+
+        JavaNetSinkHttpClient client =
+                new JavaNetSinkHttpClient(
+                        sinkConfig(new Properties()), headerPreprocessor, submitterFactory);
+
+        var response = client.putRequests(batchEntries, "http://localhost").join();
+
+        assertThat(response.getSuccessfulRequests()).isEmpty();
+        assertThat(response.getFailedRequests()).containsExactlyElementsOf(batchEntries);
+        assertThat(response.getFatalFailedRequests()).isEmpty();
+    }
+
     private static CompletableFuture<JavaNetHttpResponseWrapper> responseFuture(
             HttpSinkRequestEntry requestEntry, int statusCode) {
+        return responseFuture(List.of(requestEntry), statusCode);
+    }
+
+    private static CompletableFuture<JavaNetHttpResponseWrapper> responseFuture(
+            List<HttpSinkRequestEntry> requestEntries, int statusCode) {
         HttpRequest request =
                 new HttpRequest(
                         java.net.http.HttpRequest.newBuilder(
                                         java.net.URI.create("http://localhost"))
                                 .method(
-                                        requestEntry.method,
+                                        requestEntries.get(0).method,
                                         java.net.http.HttpRequest.BodyPublishers.noBody())
                                 .build(),
-                        List.of(requestEntry.element),
-                        requestEntry.method,
-                        List.of(requestEntry));
+                        requestEntries.stream()
+                                .map(requestEntry -> requestEntry.element)
+                                .collect(Collectors.toList()),
+                        requestEntries.get(0).method,
+                        requestEntries);
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(statusCode);
         return CompletableFuture.completedFuture(new JavaNetHttpResponseWrapper(request, response));
