@@ -87,11 +87,17 @@ public class JavaNetSinkHttpClient implements SinkHttpClient {
 
         var properties = sinkConfig.getProperties();
         this.httpPostRequestCallback = sinkConfig.getHttpPostRequestCallback();
+        HeaderPreprocessor effectiveHeaderPreprocessor =
+                HttpHeaderUtils.createSinkOIDCHeaderPreprocessor(sinkConfig.getReadableConfig());
+        if (effectiveHeaderPreprocessor == null) {
+            effectiveHeaderPreprocessor = headerPreprocessor;
+        }
+
         this.headerMap =
                 HttpHeaderUtils.prepareHeaderMap(
                         HttpConnectorConfigConstants.SINK_HEADER_PREFIX,
                         properties,
-                        headerPreprocessor);
+                        effectiveHeaderPreprocessor);
 
         this.responseClassifier = new HttpSinkResponseClassifier(sinkConfig);
 
@@ -145,20 +151,61 @@ public class JavaNetSinkHttpClient implements SinkHttpClient {
         for (var response : responses) {
             var sinkRequestEntry = response.getHttpRequest();
             var optResponse = response.getResponse();
+            attemptResult.incrementHttpRequestCount();
+            if (response.getRequestDurationMillis() >= 0) {
+                attemptResult.addRequestLatencyMillis(response.getRequestDurationMillis());
+            }
             optResponse.ifPresent(this.httpLogger::logResponse);
             httpPostRequestCallback.call(
                     optResponse.orElse(null), sinkRequestEntry, endpointUrl, headerMap);
 
+            optResponse.ifPresent(
+                    httpResponse ->
+                            attemptResult.incrementStatusCodeCount(
+                                    httpResponse.statusCode(),
+                                    sinkRequestEntry.getRequestEntries().size()));
+
             switch (responseClassifier.classify(optResponse.orElse(null))) {
                 case SUCCESS:
+                    attemptResult.addSuccessfulRequests(sinkRequestEntry.getRequestEntries());
+                    break;
                 case IGNORED:
                     attemptResult.addSuccessfulRequests(sinkRequestEntry.getRequestEntries());
+                    attemptResult.addIgnoredRequests(sinkRequestEntry.getRequestEntries());
+                    log.info(
+                            "HTTP sink ignored response status {} for {} request entry(s) to {} using method {}",
+                            optResponse.map(java.net.http.HttpResponse::statusCode).orElse(null),
+                            sinkRequestEntry.getRequestEntries().size(),
+                            endpointUrl,
+                            sinkRequestEntry.getMethod());
                     break;
                 case RETRYABLE_FAILURE:
                     attemptResult.addRetryableRequests(sinkRequestEntry.getRequestEntries());
+                    if (optResponse.isEmpty()) {
+                        attemptResult.addExceptionFailedRequests(
+                                sinkRequestEntry.getRequestEntries());
+                        log.warn(
+                                "HTTP sink request to {} using method {} failed before receiving a response for {} request entry(s)",
+                                endpointUrl,
+                                sinkRequestEntry.getMethod(),
+                                sinkRequestEntry.getRequestEntries().size());
+                    } else {
+                        log.warn(
+                                "HTTP sink received retryable response status {} for {} request entry(s) to {} using method {}",
+                                optResponse.get().statusCode(),
+                                sinkRequestEntry.getRequestEntries().size(),
+                                endpointUrl,
+                                sinkRequestEntry.getMethod());
+                    }
                     break;
                 case FATAL_FAILURE:
                     attemptResult.addFatalFailedRequests(sinkRequestEntry.getRequestEntries());
+                    log.error(
+                            "HTTP sink received fatal response status {} for {} request entry(s) to {} using method {}",
+                            optResponse.map(java.net.http.HttpResponse::statusCode).orElse(null),
+                            sinkRequestEntry.getRequestEntries().size(),
+                            endpointUrl,
+                            sinkRequestEntry.getMethod());
                     break;
             }
         }

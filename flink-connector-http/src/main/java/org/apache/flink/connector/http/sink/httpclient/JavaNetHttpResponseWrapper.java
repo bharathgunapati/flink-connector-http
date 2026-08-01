@@ -42,6 +42,23 @@ final class JavaNetHttpResponseWrapper {
     /** A response to an HTTP request based on {@link HttpSinkRequestEntry}. */
     private final HttpResponse<String> response;
 
+    /** Duration of the HTTP request in milliseconds. */
+    private final long requestDurationMillis;
+
+    public JavaNetHttpResponseWrapper(
+            @NonNull HttpRequest httpRequest, HttpResponse<String> response) {
+        this(httpRequest, response, -1);
+    }
+
+    public JavaNetHttpResponseWrapper(
+            @NonNull HttpRequest httpRequest,
+            HttpResponse<String> response,
+            long requestDurationMillis) {
+        this.httpRequest = httpRequest;
+        this.response = response;
+        this.requestDurationMillis = requestDurationMillis;
+    }
+
     public Optional<HttpResponse<String>> getResponse() {
         return Optional.ofNullable(response);
     }

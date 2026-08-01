@@ -25,15 +25,19 @@ import org.apache.flink.connector.base.sink.writer.ResultHandler;
 import org.apache.flink.connector.base.sink.writer.config.AsyncSinkWriterConfiguration;
 import org.apache.flink.connector.http.HttpSink;
 import org.apache.flink.connector.http.clients.SinkHttpClient;
+import org.apache.flink.connector.http.clients.SinkHttpClientResponse;
 import org.apache.flink.connector.http.config.HttpSinkConfig;
 import org.apache.flink.connector.http.utils.ThreadUtils;
 import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.Histogram;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
 
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -62,6 +66,26 @@ public class HttpSinkWriter<InputT> extends AsyncSinkWriter<InputT, HttpSinkRequ
     private final SinkHttpClient sinkHttpClient;
 
     private final Counter numRecordsSendErrorsCounter;
+
+    private final Counter retryableResponseFailuresCounter;
+
+    private final Counter fatalResponseFailuresCounter;
+
+    private final Counter ignoredResponsesCounter;
+
+    private final Counter retryExhaustedCounter;
+
+    private final Counter requestExceptionsCounter;
+
+    private final Counter retryAttemptsCounter;
+
+    private final Counter httpRequestsCounter;
+
+    private final MetricGroup statusCodeMetricGroup;
+
+    private final ConcurrentHashMap<Integer, Counter> statusCodeCounters;
+
+    private final Histogram requestLatencyMillisHistogram;
 
     public HttpSinkWriter(
             ElementConverter<InputT, HttpSinkRequestEntry> elementConverter,
@@ -94,6 +118,20 @@ public class HttpSinkWriter<InputT> extends AsyncSinkWriter<InputT, HttpSinkRequ
 
         var metrics = context.metricGroup();
         this.numRecordsSendErrorsCounter = metrics.getNumRecordsSendErrorsCounter();
+        MetricGroup httpSinkMetricGroup = metrics.addGroup("http_sink_connector");
+        this.retryableResponseFailuresCounter =
+                httpSinkMetricGroup.counter("numRetryableResponseFailures");
+        this.fatalResponseFailuresCounter = httpSinkMetricGroup.counter("numFatalResponseFailures");
+        this.ignoredResponsesCounter = httpSinkMetricGroup.counter("numIgnoredResponses");
+        this.retryExhaustedCounter = httpSinkMetricGroup.counter("numRetryExhausted");
+        this.requestExceptionsCounter = httpSinkMetricGroup.counter("numRequestExceptions");
+        this.retryAttemptsCounter = httpSinkMetricGroup.counter("numRetryAttempts");
+        this.httpRequestsCounter = httpSinkMetricGroup.counter("numHttpRequests");
+        this.requestLatencyMillisHistogram =
+                httpSinkMetricGroup.histogram(
+                        "requestLatencyMs", new HttpSinkRequestLatencyHistogram(1024));
+        this.statusCodeMetricGroup = httpSinkMetricGroup.addGroup("status_code");
+        this.statusCodeCounters = new ConcurrentHashMap<>();
 
         int sinkWriterThreadPoolSize = sinkConfig.getWriterThreadPoolSize();
 
@@ -114,9 +152,12 @@ public class HttpSinkWriter<InputT> extends AsyncSinkWriter<InputT, HttpSinkRequ
                     if (err != null) {
                         int failedRequestsNumber = requestEntries.size();
                         log.error(
-                                "Http Sink fatally failed to write all {} requests",
-                                failedRequestsNumber);
+                                "HTTP sink request to {} failed before receiving a response for {} request entry(s)",
+                                endpointUrl,
+                                failedRequestsNumber,
+                                err);
                         numRecordsSendErrorsCounter.inc(failedRequestsNumber);
+                        requestExceptionsCounter.inc(failedRequestsNumber);
 
                         resultHandler.completeExceptionally(
                                 new RuntimeException(
@@ -125,30 +166,70 @@ public class HttpSinkWriter<InputT> extends AsyncSinkWriter<InputT, HttpSinkRequ
                                                 + " request(s).",
                                         err));
                     } else if (!response.getFatalFailedRequests().isEmpty()) {
+                        recordResponseMetrics(response);
                         int failedRequestsNumber = response.getFatalFailedRequests().size();
-                        log.error("Http Sink failed to write {} requests", failedRequestsNumber);
+                        log.error(
+                                "HTTP sink received fatal response status for {} request entry(s) to {}",
+                                failedRequestsNumber,
+                                endpointUrl);
                         numRecordsSendErrorsCounter.inc(failedRequestsNumber);
                         resultHandler.completeExceptionally(
                                 new RuntimeException(
                                         "HTTP sink received fatal response status for "
-                                                + failedRequestsNumber
-                                                + " request(s)."));
+                                                + requestEntryText(failedRequestsNumber)
+                                                + "."));
                     } else if (!response.getFailedRequests().isEmpty()) {
+                        recordResponseMetrics(response);
                         int failedRequestsNumber = response.getFailedRequests().size();
                         log.error(
-                                "Http Sink exhausted client-level retries for {} retryable requests",
-                                failedRequestsNumber);
+                                "HTTP sink exhausted client-level retries for {} request entry(s) to {}",
+                                failedRequestsNumber,
+                                endpointUrl);
                         numRecordsSendErrorsCounter.inc(failedRequestsNumber);
+                        retryExhaustedCounter.inc(failedRequestsNumber);
                         resultHandler.completeExceptionally(
                                 new RuntimeException(
                                         "HTTP sink exhausted retries for "
-                                                + failedRequestsNumber
-                                                + " request(s)."));
+                                                + requestEntryText(failedRequestsNumber)
+                                                + "."));
                     } else {
+                        recordResponseMetrics(response);
                         resultHandler.complete();
                     }
                 },
                 sinkWriterThreadPool);
+    }
+
+    private void recordResponseMetrics(SinkHttpClientResponse response) {
+        httpRequestsCounter.inc(response.getHttpRequestCount());
+        response.getRequestLatenciesMillis().forEach(requestLatencyMillisHistogram::update);
+        incrementStatusCodeCounters(response);
+        fatalResponseFailuresCounter.inc(response.getFatalFailedRequests().size());
+        ignoredResponsesCounter.inc(response.getIgnoredRequests().size());
+        requestExceptionsCounter.inc(response.getExceptionFailedRequests().size());
+        retryableResponseFailuresCounter.inc(
+                Math.max(
+                        0,
+                        response.getFailedRequests().size()
+                                - response.getExceptionFailedRequests().size()));
+        retryAttemptsCounter.inc(response.getRetryAttemptCount());
+    }
+
+    private void incrementStatusCodeCounters(SinkHttpClientResponse response) {
+        response.getStatusCodeCounts()
+                .forEach(
+                        (statusCode, count) ->
+                                statusCodeCounters
+                                        .computeIfAbsent(
+                                                statusCode,
+                                                code ->
+                                                        statusCodeMetricGroup.counter(
+                                                                String.valueOf(code)))
+                                        .inc(count));
+    }
+
+    private static String requestEntryText(int requestEntryCount) {
+        return requestEntryCount + (requestEntryCount == 1 ? " request entry" : " request entries");
     }
 
     @Override

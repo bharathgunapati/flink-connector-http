@@ -24,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpClient.Version;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
@@ -32,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /** This implementation creates HTTP requests for every processed event. */
 @Slf4j
@@ -55,6 +55,7 @@ public class PerRequestSubmitter extends AbstractRequestSubmitter {
 
         for (var entry : requestToSubmit) {
             HttpRequest httpRequest = buildHttpRequest(entry, endpointUri);
+            long startNanos = System.nanoTime();
             var response =
                     httpClient
                             .sendAsync(
@@ -70,7 +71,12 @@ public class PerRequestSubmitter extends AbstractRequestSubmitter {
                                         return null;
                                     })
                             .thenApplyAsync(
-                                    res -> new JavaNetHttpResponseWrapper(httpRequest, res),
+                                    res ->
+                                            new JavaNetHttpResponseWrapper(
+                                                    httpRequest,
+                                                    res,
+                                                    TimeUnit.NANOSECONDS.toMillis(
+                                                            System.nanoTime() - startNanos)),
                                     publishingThreadPool);
             responseFutures.add(response);
         }
@@ -79,10 +85,8 @@ public class PerRequestSubmitter extends AbstractRequestSubmitter {
 
     private HttpRequest buildHttpRequest(HttpSinkRequestEntry requestEntry, URI endpointUri) {
         Builder requestBuilder =
-                java.net.http.HttpRequest.newBuilder()
+                newRequestBuilder()
                         .uri(endpointUri)
-                        .version(Version.HTTP_1_1)
-                        .timeout(httpRequestTimeout)
                         .method(
                                 requestEntry.method,
                                 BodyPublishers.ofByteArray(requestEntry.element));

@@ -61,6 +61,8 @@ The HTTP source connector supports [Lookup Joins](https://nightlies.apache.org/f
     * [HTTP Sink](#http-sink)
     * [Sink Connector Options](#sink-connector-options)
     * [Sink table HTTP status codes](#sink-table-http-status-codes)
+    * [Retries and handling errors (Sink)](#retries-and-handling-errors-sink)
+    * [Sink failure observability](#sink-failure-observability)
     * [Request submission](#request-submission)
     * [Batch submission mode](#batch-submission-mode)
     * [Single submission mode](#single-submission-mode)
@@ -594,30 +596,83 @@ another format name.
 | sink.flush-buffer.timeout                 | optional | Threshold time in milliseconds for an element to be in a buffer before being flushed.                                                                                                                                              |
 | http.logging.level                        | optional | Logging levels for HTTP content. Valid values are `MIN` (the default), `REQ_RESP` and `MAX`.                                                                                                                                       |
 | http.sink.request-callback                | optional | Specify which `HttpPostRequestCallback` implementation to use. By default, it is set to `slf4j-logger` corresponding to `Slf4jHttpPostRequestCallback`.                                                                            |
-| http.sink.error.code                      | optional | List of HTTP status codes that should be treated as errors by HTTP Sink, separated with comma.                                                                                                                                     |
-| http.sink.error.code.exclude              | optional | List of HTTP status codes that should be excluded from the `http.sink.error.code` list, separated with comma.                                                                                                                      |
+| http.sink.success-codes                   | optional | Comma separated HTTP status codes considered as successful sink responses. Use [1-5]XX for groups and '!' for exclusions. The default is `2XX`.                                                                                    |
+| http.sink.retry-codes                     | optional | Comma separated HTTP status codes considered as retryable sink responses. Use [1-5]XX for groups and '!' for exclusions. The default is `500,503,504`.                                                                            |
+| http.sink.ignored-response-codes          | optional | Comma separated HTTP status codes that should be treated as successful without retrying.                                                                                                                                            |
+| http.sink.max-retries                     | optional | Maximum number of retries for failed HTTP sink requests. Set to `0` to disable retries. The default is `3`.                                                                                                                        |
+| http.sink.retry-strategy.type             | optional | Retry strategy type for HTTP sink requests. Valid values are `fixed-delay` and `exponential-delay`. The default is `fixed-delay`.                                                                                                  |
+| http.sink.retry-strategy.fixed-delay.delay | optional | Fixed-delay interval between HTTP sink retries. The default is `1s`.                                                                                                                                                               |
+| http.sink.retry-strategy.exponential-delay.initial-backoff | optional | Exponential-delay initial backoff for HTTP sink retries. The default is `1s`.                                                                                                                                      |
+| http.sink.retry-strategy.exponential-delay.max-backoff | optional | Exponential-delay maximum backoff for HTTP sink retries. The default is `1min`.                                                                                                                                         |
+| http.sink.retry-strategy.exponential-delay.backoff-multiplier | optional | Exponential-delay backoff multiplier for HTTP sink retries. The default is `1.5`.                                                                                                                                   |
+| http.sink.error.code.exclude              | optional | Legacy alias for ignored response codes. Prefer `http.sink.ignored-response-codes` for new configurations.                                                                                                                        |
 | http.security.cert.server                 | optional | Path to trusted HTTP server certificate that should be added to connectors key store. More than one path can be specified using `,` as path delimiter.                                                                               |
 | http.security.cert.client                 | optional | Path to trusted certificate that should be used by connector's HTTP client for mTLS communication.                                                                                                                                 |
 | http.security.key.client                  | optional | Path to trusted private key that should be used by connector's HTTP client for mTLS communication.                                                                                                                                 |
 | http.security.cert.server.allowSelfSigned | optional | Accept untrusted certificates for TLS communication.                                                                                                                                                                               |
+| http.security.oidc.token.request          | optional | OIDC `Token Request` body in `application/x-www-form-urlencoded` encoding. Required when `http.security.oidc.token.endpoint.url` is configured.                                                                                    |
+| http.security.oidc.token.endpoint.url     | optional | OIDC `Token Endpoint` URL to which the token request will be issued.                                                                                                                                                               |
+| http.security.oidc.token.expiry.reduction | optional | OIDC tokens will be requested if the current time is later than the cached token expiry time minus this value. The default is `1s`.                                                                                                |
 | http.sink.request.timeout                 | optional | Sets HTTP request timeout for the HTTP sink as a Duration (e.g. `'30s'`, `'1min'`). If not specified, the default value of `30s` will be used.                                                                                                                              |
+| http.sink.http-version                    | optional | Version of HTTP to use for sink HTTP requests. Valid values are `HTTP_1_1` and `HTTP_2`. The default is `HTTP_1_1`.                                                                                                               |
+| http.sink.proxy.host                      | optional | Hostname of the proxy used by the sink HTTP client.                                                                                                                                                                                |
+| http.sink.proxy.port                      | optional | Port of the proxy used by the sink HTTP client.                                                                                                                                                                                    |
+| http.sink.proxy.username                  | optional | Username used for sink proxy authentication.                                                                                                                                                                                       |
+| http.sink.proxy.password                  | optional | Password used for sink proxy authentication.                                                                                                                                                                                       |
 | http.sink.writer.thread-pool.size         | optional | Sets the size of pool thread for HTTP Sink request processing. Increasing this value would mean that more concurrent requests can be processed in the same time. If not specified, the default value of 1 thread will be used.     |
 | http.sink.writer.request.mode             | optional | Sets the Http Sink request submission mode. Two modes are available: `single` and `batch`. Defaults to `batch` if not specified. |
 | http.sink.request.batch.size              | optional | Applicable only for `http.sink.writer.request.mode = batch`. Sets number of individual events/requests that will be submitted as one HTTP request by HTTP sink. The default value is 500 which is same as HTTP Sink `maxBatchSize` |
 
 ### Sink table HTTP status codes
-You can configure a list of HTTP status codes that should be treated as errors for HTTP sink table.
-By default all 400 and 500 response codes will be interpreted as an error code.
+The sink categorizes HTTP responses into three groups based on status codes:
+- Success codes (`http.sink.success-codes`):
+  These responses are treated as successful writes.
+- Retry codes (`http.sink.retry-codes`):
+  These responses indicate temporary failures. The sink retries the affected request entries up to `http.sink.max-retries`.
+- Ignored responses (`http.sink.ignored-response-codes`):
+  These responses are treated as successful writes without retrying.
+- Fatal responses:
+  Any response code that is not classified as success, ignored, or retryable is treated as fatal and fails the job.
 
-This behavior can be changed by using the below properties in the table definition. The property names are:
-- `http.sink.error.code` used to define HTTP status code value that should be treated as error for example 404.
-  Many status codes can be defined in one value, where each code should be separated with comma, for example:
-  `401, 402, 403`. User can use this property also to define a type code mask. In that case, all codes from given HTTP response type will be treated as errors.
-  An example of such a mask would be `3XX, 4XX, 5XX`. In this case, all 300s, 400s and 500s status codes will be treated as errors.
-- `http.sink.error.code.exclude` used to exclude a HTTP code from error list.
-  Many status codes can be defined in one value, where each code should be separated with comma, for example:
-  `401, 402, 403`. In this example, codes 401, 402 and 403 would not be interpreted as error codes.
+`http.sink.error.code.exclude` is kept as a legacy alias for ignored response codes. New configurations should use
+`http.sink.ignored-response-codes`.
 
+### Retries and handling errors (Sink)
+HTTP sink retries occur when a request fails with an exception or when the HTTP response status code is listed in
+`http.sink.retry-codes`. Retry delay is controlled by `http.sink.retry-strategy.type` and the matching fixed-delay or
+exponential-delay options.
+
+When retries are exhausted, the sink fails the job. Set `http.sink.max-retries` to `0` to disable retries.
+
+In batch submission mode, one HTTP response represents all records included in the submitted HTTP batch. A retryable batch
+response retries every entry in that batch; a fatal response or exhausted retry limit fails the batch as a unit.
+
+### Sink failure observability
+The HTTP sink increments Flink's standard `numRecordsSendErrors` counter when request entries fail.
+It also registers sink-specific counters under the `http_sink_connector` metric group:
+
+| Metric | Description |
+|--------|-------------|
+| numHttpRequests | Number of actual HTTP requests completed by the sink client. |
+| numRetryableResponseFailures | Number of request entries that received a retryable HTTP response status. |
+| numFatalResponseFailures | Number of request entries that received a fatal HTTP response status. |
+| numIgnoredResponses | Number of request entries whose HTTP response status was ignored and treated as successful. |
+| numRetryExhausted | Number of request entries that failed after exhausting retries. |
+| numRequestExceptions | Number of request entries that failed before receiving an HTTP response. |
+| numRetryAttempts | Number of request entries scheduled for another retry attempt. |
+| requestLatencyMs | Histogram of actual HTTP request durations in milliseconds. |
+
+The sink also registers status-code counters under the `http_sink_connector.status_code` metric
+group. Each counter is named after the HTTP status code and is incremented by the number of request
+entries affected by that response. For example, a batched request containing 50 entries that receives
+HTTP 500 increments the `500` status-code counter by 50.
+
+`numHttpRequests` and `requestLatencyMs` are measured per actual HTTP request. In single submission
+mode this usually maps to one sink entry. In batch submission mode one HTTP request can contain many
+sink entries.
+
+Failure logs include the endpoint, affected request-entry count, and, where available, the response
+status and HTTP method.
 
 ### Request submission
 HTTP Sink by default submits events in batch. The submission mode can be changed using `http.sink.writer.request.mode` property using `single` or `batch` as property value.

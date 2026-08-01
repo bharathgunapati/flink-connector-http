@@ -24,7 +24,9 @@ import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executors;
@@ -51,6 +53,7 @@ class HttpSinkClientWithRetry {
                     attemptSubmitter) {
         var requestEntriesToSubmit = new AtomicReference<>(requestEntries);
         var responseAccumulator = new ResponseAccumulator();
+        var attemptCount = new AtomicReference<>(1);
         Retry retry =
                 Retry.of(
                         "http-sink-connector",
@@ -61,6 +64,13 @@ class HttpSinkClientWithRetry {
                                             if (attemptResult.hasRetryableRequests()) {
                                                 requestEntriesToSubmit.set(
                                                         attemptResult.getRetryableRequests());
+                                                if (attemptCount.getAndUpdate(count -> count + 1)
+                                                        < retryConfig.getMaxAttempts()) {
+                                                    responseAccumulator.recordRetryAttempt(
+                                                            attemptResult
+                                                                    .getRetryableRequests()
+                                                                    .size());
+                                                }
                                                 return true;
                                             }
                                             return false;
@@ -90,10 +100,29 @@ class HttpSinkClientWithRetry {
         private final List<HttpSinkRequestEntry> successfulRequests = new ArrayList<>();
         private final List<HttpSinkRequestEntry> failedRequests = new ArrayList<>();
         private final List<HttpSinkRequestEntry> fatalFailedRequests = new ArrayList<>();
+        private final List<HttpSinkRequestEntry> ignoredRequests = new ArrayList<>();
+        private final List<HttpSinkRequestEntry> exceptionFailedRequests = new ArrayList<>();
+        private final Map<Integer, Integer> statusCodeCounts = new HashMap<>();
+        private final List<Long> requestLatenciesMillis = new ArrayList<>();
+        private int httpRequestCount;
+        private int retryAttemptCount;
 
         private void add(HttpSinkAttemptResult attemptResult) {
             successfulRequests.addAll(attemptResult.getSuccessfulRequests());
             fatalFailedRequests.addAll(attemptResult.getFatalFailedRequests());
+            ignoredRequests.addAll(attemptResult.getIgnoredRequests());
+            exceptionFailedRequests.addAll(attemptResult.getExceptionFailedRequests());
+            attemptResult
+                    .getStatusCodeCounts()
+                    .forEach(
+                            (statusCode, count) ->
+                                    statusCodeCounts.merge(statusCode, count, Integer::sum));
+            httpRequestCount += attemptResult.getHttpRequestCount();
+            requestLatenciesMillis.addAll(attemptResult.getRequestLatenciesMillis());
+        }
+
+        private void recordRetryAttempt(int requestEntryCount) {
+            retryAttemptCount += requestEntryCount;
         }
 
         private void markRetriesExhausted(HttpSinkAttemptResult attemptResult) {
@@ -102,7 +131,15 @@ class HttpSinkClientWithRetry {
 
         private SinkHttpClientResponse toResponse() {
             return new SinkHttpClientResponse(
-                    successfulRequests, failedRequests, fatalFailedRequests);
+                    successfulRequests,
+                    failedRequests,
+                    fatalFailedRequests,
+                    ignoredRequests,
+                    exceptionFailedRequests,
+                    statusCodeCounts,
+                    httpRequestCount,
+                    requestLatenciesMillis,
+                    retryAttemptCount);
         }
     }
 

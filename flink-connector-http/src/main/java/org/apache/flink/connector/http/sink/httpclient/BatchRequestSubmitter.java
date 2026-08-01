@@ -26,7 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.net.http.HttpClient.Version;
 import java.net.http.HttpRequest.BodyPublisher;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpRequest.Builder;
@@ -37,6 +36,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This implementation groups received events in batches and submits each batch as individual HTTP
@@ -106,6 +106,7 @@ public class BatchRequestSubmitter extends AbstractRequestSubmitter {
             String endpointUrl, List<HttpSinkRequestEntry> requestBatch) {
 
         HttpRequest httpRequest = buildHttpRequest(requestBatch, URI.create(endpointUrl));
+        long startNanos = System.nanoTime();
         return httpClient
                 .sendAsync(httpRequest.getHttpRequest(), HttpResponse.BodyHandlers.ofString())
                 .exceptionally(
@@ -116,7 +117,12 @@ public class BatchRequestSubmitter extends AbstractRequestSubmitter {
                             return null;
                         })
                 .thenApplyAsync(
-                        res -> new JavaNetHttpResponseWrapper(httpRequest, res),
+                        res ->
+                                new JavaNetHttpResponseWrapper(
+                                        httpRequest,
+                                        res,
+                                        TimeUnit.NANOSECONDS.toMillis(
+                                                System.nanoTime() - startNanos)),
                         publishingThreadPool);
     }
 
@@ -139,12 +145,7 @@ public class BatchRequestSubmitter extends AbstractRequestSubmitter {
             elements.set(elements.size() - 1, BATCH_END_BYTES);
             publisher = BodyPublishers.ofByteArrays(elements);
 
-            Builder requestBuilder =
-                    java.net.http.HttpRequest.newBuilder()
-                            .uri(endpointUri)
-                            .version(Version.HTTP_1_1)
-                            .timeout(httpRequestTimeout)
-                            .method(method, publisher);
+            Builder requestBuilder = newRequestBuilder().uri(endpointUri).method(method, publisher);
 
             if (headersAndValues.length != 0) {
                 requestBuilder.headers(headersAndValues);
