@@ -17,7 +17,6 @@
 
 package org.apache.flink.connector.http.sink.httpclient;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.http.HttpSink;
 import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
 
@@ -33,7 +32,6 @@ import java.util.Optional;
  * HttpSinkRequestEntry} along some other element that it is logically connected with.
  */
 @Data
-@PublicEvolving
 final class JavaNetHttpResponseWrapper {
 
     /** A representation of a single {@link HttpSink} request. */

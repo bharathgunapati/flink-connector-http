@@ -18,23 +18,12 @@
 package org.apache.flink.connector.http.clients;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.connector.http.HttpPostRequestCallback;
-import org.apache.flink.connector.http.preprocessor.HeaderPreprocessor;
-import org.apache.flink.connector.http.sink.httpclient.HttpRequest;
-import org.apache.flink.connector.http.sink.httpclient.RequestSubmitterFactory;
 
 import java.io.Serializable;
-import java.util.Properties;
 
 /** Builder building {@link SinkHttpClient}. */
 @PublicEvolving
 public interface SinkHttpClientBuilder extends Serializable {
 
-    // TODO Consider moving HttpPostRequestCallback and HeaderPreprocessor, RequestSubmitter to be a
-    //  SinkHttpClientBuilder fields. This method is getting more and more arguments.
-    SinkHttpClient build(
-            Properties properties,
-            HttpPostRequestCallback<HttpRequest> httpPostRequestCallback,
-            HeaderPreprocessor headerPreprocessor,
-            RequestSubmitterFactory requestSubmitterFactory);
+    SinkHttpClient build(SinkHttpClientContext context);
 }

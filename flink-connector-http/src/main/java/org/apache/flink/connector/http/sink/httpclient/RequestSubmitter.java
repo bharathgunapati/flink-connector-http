@@ -17,15 +17,13 @@
 
 package org.apache.flink.connector.http.sink.httpclient;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /** Submits request via HTTP. */
-@PublicEvolving
-public interface RequestSubmitter {
+interface RequestSubmitter {
 
     List<CompletableFuture<JavaNetHttpResponseWrapper>> submit(
             String endpointUrl, List<HttpSinkRequestEntry> requestToSubmit);

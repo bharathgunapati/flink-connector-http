@@ -27,13 +27,10 @@ import org.apache.flink.connector.http.HttpSinkBuilder;
 import org.apache.flink.connector.http.SchemaLifecycleAwareElementConverter;
 import org.apache.flink.connector.http.clients.SinkHttpClient;
 import org.apache.flink.connector.http.clients.SinkHttpClientBuilder;
-import org.apache.flink.connector.http.config.HttpConnectorConfigConstants;
+import org.apache.flink.connector.http.clients.SinkHttpClientContext;
 import org.apache.flink.connector.http.config.HttpSinkConfig;
-import org.apache.flink.connector.http.config.SinkRequestSubmitMode;
 import org.apache.flink.connector.http.preprocessor.HeaderPreprocessor;
-import org.apache.flink.connector.http.sink.httpclient.BatchRequestSubmitterFactory;
-import org.apache.flink.connector.http.sink.httpclient.PerRequestRequestSubmitterFactory;
-import org.apache.flink.connector.http.sink.httpclient.RequestSubmitterFactory;
+import org.apache.flink.connector.http.sink.httpclient.HttpRequest;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
@@ -41,6 +38,7 @@ import org.apache.flink.util.StringUtils;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Properties;
 
 /**
  * An internal implementation of HTTP Sink that performs async requests against a specified HTTP
@@ -147,10 +145,8 @@ public class HttpSinkInternal<InputT> extends AsyncSinkBase<InputT, HttpSinkRequ
 
     private SinkHttpClient buildSinkHttpClient() {
         return sinkHttpClientBuilder.build(
-                sinkConfig.getProperties(),
-                sinkConfig.getHttpPostRequestCallback(),
-                headerPreprocessor,
-                getRequestSubmitterFactory());
+                new DefaultSinkHttpClientContext(
+                        sinkConfig, headerPreprocessor, getMaxBatchSize()));
     }
 
     @Override
@@ -159,17 +155,45 @@ public class HttpSinkInternal<InputT> extends AsyncSinkBase<InputT, HttpSinkRequ
         return new HttpSinkWriterStateSerializer();
     }
 
-    private RequestSubmitterFactory getRequestSubmitterFactory() {
+    private static class DefaultSinkHttpClientContext implements SinkHttpClientContext {
 
-        if (SinkRequestSubmitMode.SINGLE
-                .getMode()
-                .equalsIgnoreCase(
-                        sinkConfig
-                                .getProperties()
-                                .getProperty(
-                                        HttpConnectorConfigConstants.SINK_HTTP_REQUEST_MODE))) {
-            return new PerRequestRequestSubmitterFactory();
+        private final HttpSinkConfig sinkConfig;
+        private final HeaderPreprocessor headerPreprocessor;
+        private final int defaultBatchSize;
+
+        private DefaultSinkHttpClientContext(
+                HttpSinkConfig sinkConfig,
+                HeaderPreprocessor headerPreprocessor,
+                int defaultBatchSize) {
+            this.sinkConfig = sinkConfig;
+            this.headerPreprocessor = headerPreprocessor;
+            this.defaultBatchSize = defaultBatchSize;
         }
-        return new BatchRequestSubmitterFactory(getMaxBatchSize());
+
+        @Override
+        public Properties getProperties() {
+            return sinkConfig.getProperties();
+        }
+
+        @Override
+        public HttpSinkConfig getSinkConfig() {
+            return sinkConfig;
+        }
+
+        @Override
+        public org.apache.flink.connector.http.HttpPostRequestCallback<HttpRequest>
+                getHttpPostRequestCallback() {
+            return sinkConfig.getHttpPostRequestCallback();
+        }
+
+        @Override
+        public HeaderPreprocessor getHeaderPreprocessor() {
+            return headerPreprocessor;
+        }
+
+        @Override
+        public int getDefaultBatchSize() {
+            return defaultBatchSize;
+        }
     }
 }

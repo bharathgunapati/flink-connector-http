@@ -15,12 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.connector.http.sink.httpclient;
+package org.apache.flink.connector.http.clients;
 
+import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.connector.http.HttpPostRequestCallback;
 import org.apache.flink.connector.http.config.HttpSinkConfig;
+import org.apache.flink.connector.http.preprocessor.HeaderPreprocessor;
+import org.apache.flink.connector.http.sink.httpclient.HttpRequest;
 
-/** Request submitter factory. */
-interface RequestSubmitterFactory {
+import java.util.Properties;
 
-    RequestSubmitter createSubmitter(HttpSinkConfig sinkConfig, String[] headersAndValues);
+/** Context passed to {@link SinkHttpClientBuilder} when creating a sink HTTP client. */
+@PublicEvolving
+public interface SinkHttpClientContext {
+
+    Properties getProperties();
+
+    HttpSinkConfig getSinkConfig();
+
+    HttpPostRequestCallback<HttpRequest> getHttpPostRequestCallback();
+
+    HeaderPreprocessor getHeaderPreprocessor();
+
+    int getDefaultBatchSize();
 }

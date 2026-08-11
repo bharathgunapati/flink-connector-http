@@ -26,7 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Per request submitter factory. */
-public class PerRequestRequestSubmitterFactory implements RequestSubmitterFactory {
+class PerRequestRequestSubmitterFactory implements RequestSubmitterFactory {
 
     // TODO Add this property to config. Make sure to add note in README.md that will describe that
     //  any value greater than one will break order of messages.

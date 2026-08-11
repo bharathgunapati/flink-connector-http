@@ -22,10 +22,11 @@ import org.apache.flink.connector.http.HttpLogger;
 import org.apache.flink.connector.http.HttpPostRequestCallback;
 import org.apache.flink.connector.http.clients.SinkHttpClient;
 import org.apache.flink.connector.http.clients.SinkHttpClientBuilder;
+import org.apache.flink.connector.http.clients.SinkHttpClientContext;
 import org.apache.flink.connector.http.clients.SinkHttpClientResponse;
 import org.apache.flink.connector.http.config.HttpConnectorConfigConstants;
 import org.apache.flink.connector.http.config.HttpSinkConfig;
-import org.apache.flink.connector.http.config.HttpSinkConfigFactory;
+import org.apache.flink.connector.http.config.SinkRequestSubmitMode;
 import org.apache.flink.connector.http.preprocessor.HeaderPreprocessor;
 import org.apache.flink.connector.http.retry.SinkRetryConfigProvider;
 import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
@@ -37,7 +38,6 @@ import java.net.http.HttpClient;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
@@ -66,21 +66,16 @@ public class JavaNetSinkHttpClient implements SinkHttpClient {
     public static SinkHttpClientBuilder builder() {
         return new SinkHttpClientBuilder() {
             @Override
-            public SinkHttpClient build(
-                    Properties properties,
-                    HttpPostRequestCallback<HttpRequest> httpPostRequestCallback,
-                    HeaderPreprocessor headerPreprocessor,
-                    RequestSubmitterFactory requestSubmitterFactory) {
+            public SinkHttpClient build(SinkHttpClientContext context) {
                 return new JavaNetSinkHttpClient(
-                        HttpSinkConfigFactory.fromDataStream(
-                                null, properties, httpPostRequestCallback),
-                        headerPreprocessor,
-                        requestSubmitterFactory);
+                        context.getSinkConfig(),
+                        context.getHeaderPreprocessor(),
+                        createRequestSubmitterFactory(context));
             }
         };
     }
 
-    public JavaNetSinkHttpClient(
+    JavaNetSinkHttpClient(
             HttpSinkConfig sinkConfig,
             HeaderPreprocessor headerPreprocessor,
             RequestSubmitterFactory requestSubmitterFactory) {
@@ -169,5 +164,18 @@ public class JavaNetSinkHttpClient implements SinkHttpClient {
     @VisibleForTesting
     String[] getHeadersAndValues() {
         return Arrays.copyOf(headersAndValues, headersAndValues.length);
+    }
+
+    private static RequestSubmitterFactory createRequestSubmitterFactory(
+            SinkHttpClientContext context) {
+        if (SinkRequestSubmitMode.SINGLE
+                .getMode()
+                .equalsIgnoreCase(
+                        context.getProperties()
+                                .getProperty(
+                                        HttpConnectorConfigConstants.SINK_HTTP_REQUEST_MODE))) {
+            return new PerRequestRequestSubmitterFactory();
+        }
+        return new BatchRequestSubmitterFactory(context.getDefaultBatchSize());
     }
 }

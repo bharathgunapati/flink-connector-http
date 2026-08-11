@@ -30,7 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Batch request submitter factory. */
-public class BatchRequestSubmitterFactory implements RequestSubmitterFactory {
+class BatchRequestSubmitterFactory implements RequestSubmitterFactory {
 
     // TODO Add this property to config. Make sure to add note in README.md that will describe that
     //  any value greater than one will break order of messages.
