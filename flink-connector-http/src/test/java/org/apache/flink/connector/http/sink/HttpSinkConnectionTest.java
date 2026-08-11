@@ -286,7 +286,9 @@ public class HttpSinkConnectionTest {
                         .willReturn(aResponse().withStatus(200))
                         .willSetStateTo("Cause Success"));
 
-        var source = env.fromCollection(List.of(messages.get(0), messages.get(1)));
+        env.setParallelism(1);
+        var sourceMessages = List.of(messages.get(0), messages.get(1));
+        var source = env.fromCollection(sourceMessages);
         var httpSink =
                 HttpSink.<String>builder()
                         .setEndpointUrl("http://localhost:" + serverPort + "/myendpoint")
@@ -312,16 +314,12 @@ public class HttpSinkConnectionTest {
         assertThat(SendErrorsTestReporterFactory.getCount()).isZero();
         var postedRequests =
                 wireMockServer.findAll(postRequestedFor(urlPathEqualTo("/myendpoint")));
-        assertThat(postedRequests).hasSize(3);
-
-        Map<String, Long> requestBodyCounts =
-                postedRequests.stream()
-                        .map(request -> request.getBodyAsString())
-                        .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-        assertThat(requestBodyCounts.keySet())
-                .containsExactlyInAnyOrder(
-                        "[" + messages.get(0) + "]", "[" + messages.get(1) + "]");
-        assertThat(requestBodyCounts.values()).containsExactlyInAnyOrder(1L, 2L);
+        var expectedBatchBody = "[" + String.join(",", sourceMessages) + "]";
+        assertThat(postedRequests).hasSize(2);
+        assertThat(postedRequests)
+                .allSatisfy(
+                        request ->
+                                assertThat(request.getBodyAsString()).isEqualTo(expectedBatchBody));
     }
 
     @Test
