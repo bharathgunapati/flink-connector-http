@@ -231,8 +231,10 @@ public class HttpDynamicTableSinkFactory extends AsyncDynamicTableSinkFactory {
             var successCodes = new HashSet<Integer>();
             successCodes.addAll(HttpCodesParser.parse(tableOptions.get(SINK_HTTP_SUCCESS_CODES)));
             successCodes.addAll(ignoredCodes);
-            new HttpResponseChecker(
-                    successCodes, HttpCodesParser.parse(tableOptions.get(SINK_HTTP_RETRY_CODES)));
+            var retryCodes =
+                    new HashSet<>(HttpCodesParser.parse(tableOptions.get(SINK_HTTP_RETRY_CODES)));
+            retryCodes.removeAll(ignoredCodes);
+            new HttpResponseChecker(successCodes, retryCodes);
         } catch (ConfigurationException e) {
             throw new IllegalArgumentException("Invalid HTTP sink status-code configuration.", e);
         }

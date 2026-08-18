@@ -44,9 +44,9 @@ public class HttpSinkResponseClassifier {
             var successCodes = new HashSet<Integer>();
             successCodes.addAll(HttpCodesParser.parse(sinkConfig.getSuccessCodes()));
             successCodes.addAll(ignoredResponseCodes);
-            responseChecker =
-                    new HttpResponseChecker(
-                            successCodes, HttpCodesParser.parse(sinkConfig.getRetryCodes()));
+            var retryCodes = new HashSet<>(HttpCodesParser.parse(sinkConfig.getRetryCodes()));
+            retryCodes.removeAll(ignoredResponseCodes);
+            responseChecker = new HttpResponseChecker(successCodes, retryCodes);
         } catch (ConfigurationException e) {
             throw new IllegalArgumentException("Invalid HTTP sink status-code configuration", e);
         }

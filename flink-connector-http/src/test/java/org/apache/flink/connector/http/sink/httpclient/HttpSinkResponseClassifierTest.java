@@ -70,6 +70,21 @@ class HttpSinkResponseClassifierTest {
     }
 
     @Test
+    void shouldLetIgnoredCodesOverrideRetryCodes() {
+        Configuration configuration = new Configuration();
+        configuration.set(SINK_HTTP_SUCCESS_CODES, "2XX");
+        configuration.set(SINK_HTTP_RETRY_CODES, "500,503,504");
+        configuration.set(SINK_HTTP_IGNORED_RESPONSE_CODES, "500");
+
+        HttpSinkResponseClassifier classifier =
+                new HttpSinkResponseClassifier(config(configuration));
+
+        assertThat(classifier.classify(response(500))).isEqualTo(HttpSinkResponseStatus.IGNORED);
+        assertThat(classifier.classify(response(503)))
+                .isEqualTo(HttpSinkResponseStatus.RETRYABLE_FAILURE);
+    }
+
+    @Test
     void shouldClassifyLegacyErrorCodePropertyAsFatalFailure() {
         Configuration configuration = new Configuration();
         configuration.set(SINK_HTTP_SUCCESS_CODES, "2XX");

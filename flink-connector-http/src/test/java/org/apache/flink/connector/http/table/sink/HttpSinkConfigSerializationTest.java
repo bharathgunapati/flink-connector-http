@@ -150,4 +150,19 @@ public class HttpSinkConfigSerializationTest {
 
         assertThat(config.getIgnoredResponseCodes()).isEqualTo("404,405");
     }
+
+    @Test
+    public void testTableOptionsMapLegacyIncludeListToIgnoredResponseCodes() {
+        Configuration configuration = new Configuration();
+        configuration.set(HttpDynamicSinkConnectorOptions.URL, "http://localhost");
+
+        Properties properties = new Properties();
+        properties.setProperty(HTTP_ERROR_SINK_CODE_INCLUDE_LIST, "404,405");
+
+        HttpSinkConfig config =
+                HttpSinkConfigFactory.fromTableOptions(
+                        configuration, properties, new Slf4jHttpPostRequestCallback());
+
+        assertThat(config.getIgnoredResponseCodes()).isEqualTo("404,405");
+    }
 }

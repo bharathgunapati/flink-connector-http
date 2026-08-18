@@ -201,6 +201,34 @@ public class HttpDynamicTableSinkFactoryTest {
     }
 
     @Test
+    public void ignoredResponseCodesOverrideDefaultRetryCodesTest() {
+        final String ignoredRetryCode =
+                String.format(
+                        "CREATE TABLE httpIgnoredRetryCode (\n"
+                                + "  id bigint\n"
+                                + ") with (\n"
+                                + "  'connector' = '%s',\n"
+                                + "  'url' = '%s',\n"
+                                + "  'format' = 'json',\n"
+                                + "  '%s' = '500'\n"
+                                + ")",
+                        HttpDynamicTableSinkFactory.IDENTIFIER,
+                        "http://localhost/",
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_IGNORED_RESPONSE_CODES.key());
+        tEnv.executeSql(ignoredRetryCode);
+        Throwable insertFailure =
+                catchThrowable(
+                        () ->
+                                tEnv.executeSql("INSERT INTO httpIgnoredRetryCode VALUES (1)")
+                                        .await());
+        if (insertFailure != null) {
+            assertThat(insertFailure)
+                    .as("ignored response codes must override default retry codes")
+                    .isNotInstanceOf(ValidationException.class);
+        }
+    }
+
+    @Test
     public void validateRetryFixedDelayDurationTest() {
         assertInvalidRetryOption(
                 "httpFixedDelay",

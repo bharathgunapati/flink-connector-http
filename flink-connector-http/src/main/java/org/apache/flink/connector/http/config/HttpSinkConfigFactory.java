@@ -54,6 +54,7 @@ public final class HttpSinkConfigFactory {
                 readableConfig instanceof Configuration
                         ? (Configuration) readableConfig
                         : Configuration.fromMap(readableConfig.toMap());
+        setLegacyIgnoredResponseCodesIfNeeded(config, properties);
 
         return HttpSinkConfig.builder()
                 .url(readableConfig.get(HttpDynamicSinkConnectorOptions.URL))
@@ -99,18 +100,7 @@ public final class HttpSinkConfigFactory {
             configuration.set(SINK_HTTP_RETRY_CODES, retryCodes);
         }
 
-        String ignoredResponseCodes =
-                properties.getProperty(HttpConnectorConfigConstants.SINK_IGNORE_RESPONSE_CODES);
-        if (ignoredResponseCodes != null) {
-            configuration.set(SINK_HTTP_IGNORED_RESPONSE_CODES, ignoredResponseCodes);
-        } else {
-            String legacyIncludedCodes =
-                    properties.getProperty(
-                            HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST);
-            if (legacyIncludedCodes != null) {
-                configuration.set(SINK_HTTP_IGNORED_RESPONSE_CODES, legacyIncludedCodes);
-            }
-        }
+        setIgnoredResponseCodes(configuration, properties);
 
         String retryStrategy =
                 properties.getProperty(HttpConnectorConfigConstants.SINK_RETRY_STRATEGY_TYPE);
@@ -158,5 +148,29 @@ public final class HttpSinkConfigFactory {
                 .readableConfig(configuration)
                 .httpPostRequestCallback(httpPostRequestCallback)
                 .build();
+    }
+
+    private static void setLegacyIgnoredResponseCodesIfNeeded(
+            Configuration configuration, Properties properties) {
+        String ignoredResponseCodes = configuration.get(SINK_HTTP_IGNORED_RESPONSE_CODES);
+        if (ignoredResponseCodes == null || ignoredResponseCodes.isBlank()) {
+            String legacyIncludedCodes =
+                    properties.getProperty(
+                            HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST);
+            if (legacyIncludedCodes != null) {
+                configuration.set(SINK_HTTP_IGNORED_RESPONSE_CODES, legacyIncludedCodes);
+            }
+        }
+    }
+
+    private static void setIgnoredResponseCodes(
+            Configuration configuration, Properties properties) {
+        String ignoredResponseCodes =
+                properties.getProperty(HttpConnectorConfigConstants.SINK_IGNORE_RESPONSE_CODES);
+        if (ignoredResponseCodes != null) {
+            configuration.set(SINK_HTTP_IGNORED_RESPONSE_CODES, ignoredResponseCodes);
+            return;
+        }
+        setLegacyIgnoredResponseCodesIfNeeded(configuration, properties);
     }
 }
