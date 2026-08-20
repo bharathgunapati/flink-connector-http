@@ -74,10 +74,20 @@ public class HttpSinkResponseClassifier {
     }
 
     private ComposeHttpStatusCodeChecker createLegacyResponseChecker(HttpSinkConfig sinkConfig) {
-        if (StringUtils.isNullOrWhitespaceOnly(
-                sinkConfig
-                        .getProperties()
-                        .getProperty(HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST))) {
+        boolean hasLegacyErrorCodes =
+                !StringUtils.isNullOrWhitespaceOnly(
+                        sinkConfig
+                                .getProperties()
+                                .getProperty(
+                                        HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST));
+        boolean hasLegacyExcludedCodes =
+                !StringUtils.isNullOrWhitespaceOnly(
+                        sinkConfig
+                                .getProperties()
+                                .getProperty(
+                                        HttpConnectorConfigConstants
+                                                .HTTP_ERROR_SINK_CODE_INCLUDE_LIST));
+        if (!hasLegacyErrorCodes && !hasLegacyExcludedCodes) {
             return null;
         }
 

@@ -19,12 +19,15 @@ package org.apache.flink.connector.http.clients;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
+import org.apache.flink.connector.http.sink.httpclient.HttpRequest;
 
 import lombok.Data;
 import lombok.NonNull;
 import lombok.ToString;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Data class holding {@link HttpSinkRequestEntry} instances that {@link SinkHttpClient} attempted
@@ -43,4 +46,26 @@ public class SinkHttpClientResponse {
 
     /** A list of requests that {@link SinkHttpClient} failed with a fatal failure. */
     @NonNull private final List<HttpSinkRequestEntry> fatalFailedRequests;
+
+    public SinkHttpClientResponse(
+            List<HttpSinkRequestEntry> successfulRequests,
+            List<HttpSinkRequestEntry> failedRequests,
+            List<HttpSinkRequestEntry> fatalFailedRequests) {
+        this.successfulRequests = successfulRequests;
+        this.failedRequests = failedRequests;
+        this.fatalFailedRequests = fatalFailedRequests;
+    }
+
+    /** Compatibility constructor for custom clients built against the previous response shape. */
+    @Deprecated
+    public SinkHttpClientResponse(
+            List<HttpRequest> successfulRequests, List<HttpRequest> failedRequests) {
+        this(flatten(successfulRequests), flatten(failedRequests), Collections.emptyList());
+    }
+
+    private static List<HttpSinkRequestEntry> flatten(List<HttpRequest> requests) {
+        return requests.stream()
+                .flatMap(request -> request.getRequestEntries().stream())
+                .collect(Collectors.toList());
+    }
 }

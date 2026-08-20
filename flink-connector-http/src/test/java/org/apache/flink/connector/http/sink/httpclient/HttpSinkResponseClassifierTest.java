@@ -124,6 +124,25 @@ class HttpSinkResponseClassifierTest {
                 .isEqualTo(HttpSinkResponseStatus.FATAL_FAILURE);
     }
 
+    @Test
+    void shouldUseLegacyDefaultsWhenOnlyLegacyExcludedErrorCodeIsConfigured() {
+        Configuration configuration = new Configuration();
+        configuration.set(SINK_HTTP_SUCCESS_CODES, "2XX");
+        configuration.set(SINK_HTTP_RETRY_CODES, "500");
+        configuration.set(SINK_HTTP_IGNORED_RESPONSE_CODES, "404");
+
+        Properties properties = new Properties();
+        properties.setProperty(
+                HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST, "404");
+
+        HttpSinkResponseClassifier classifier =
+                new HttpSinkResponseClassifier(config(configuration, properties));
+
+        assertThat(classifier.classify(response(404))).isEqualTo(HttpSinkResponseStatus.IGNORED);
+        assertThat(classifier.classify(response(500)))
+                .isEqualTo(HttpSinkResponseStatus.FATAL_FAILURE);
+    }
+
     private static HttpSinkConfig config(Configuration configuration) {
         return config(configuration, new Properties());
     }
