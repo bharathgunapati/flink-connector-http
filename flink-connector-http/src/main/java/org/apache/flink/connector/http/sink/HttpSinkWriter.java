@@ -126,13 +126,15 @@ public class HttpSinkWriter<InputT> extends AsyncSinkWriter<InputT, HttpSinkRequ
                                         err));
                     } else if (!response.getFatalFailedRequests().isEmpty()) {
                         int failedRequestsNumber = response.getFatalFailedRequests().size();
-                        log.error("Http Sink failed to write {} requests", failedRequestsNumber);
+                        log.error(
+                                "Http Sink failed to write {} request entries due to a fatal response",
+                                failedRequestsNumber);
                         numRecordsSendErrorsCounter.inc(failedRequestsNumber);
                         resultHandler.completeExceptionally(
                                 new RuntimeException(
                                         "HTTP sink received fatal response status for "
-                                                + failedRequestsNumber
-                                                + " request(s)."));
+                                                + requestEntryText(failedRequestsNumber)
+                                                + "."));
                     } else if (!response.getFailedRequests().isEmpty()) {
                         int failedRequestsNumber = response.getFailedRequests().size();
                         log.error(
@@ -142,13 +144,17 @@ public class HttpSinkWriter<InputT> extends AsyncSinkWriter<InputT, HttpSinkRequ
                         resultHandler.completeExceptionally(
                                 new RuntimeException(
                                         "HTTP sink exhausted retries for "
-                                                + failedRequestsNumber
-                                                + " request(s)."));
+                                                + requestEntryText(failedRequestsNumber)
+                                                + "."));
                     } else {
                         resultHandler.complete();
                     }
                 },
                 sinkWriterThreadPool);
+    }
+
+    private static String requestEntryText(int requestEntryCount) {
+        return requestEntryCount + (requestEntryCount == 1 ? " request entry" : " request entries");
     }
 
     @Override
