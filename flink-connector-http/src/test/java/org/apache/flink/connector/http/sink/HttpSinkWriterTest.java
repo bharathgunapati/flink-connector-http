@@ -127,6 +127,32 @@ class HttpSinkWriterTest {
     }
 
     @Test
+    public void testRetryableBatchResponseFailsAfterClientRetriesAreExhausted()
+            throws InterruptedException {
+        List<HttpSinkRequestEntry> requests =
+                List.of(
+                        new HttpSinkRequestEntry("PUT", "hello".getBytes()),
+                        new HttpSinkRequestEntry("PUT", "world".getBytes()),
+                        new HttpSinkRequestEntry("PUT", "again".getBytes()));
+        when(httpClient.putRequests(anyList(), anyString()))
+                .thenReturn(
+                        CompletableFuture.completedFuture(
+                                new SinkHttpClientResponse(
+                                        Collections.emptyList(),
+                                        requests,
+                                        Collections.emptyList())));
+
+        RecordingResultHandler resultHandler = new RecordingResultHandler();
+        this.httpSinkWriter.submitRequestEntries(requests, resultHandler);
+
+        assertThat(resultHandler.await()).isTrue();
+        assertThat(resultHandler.getRetriedEntries()).isEmpty();
+        assertThat(resultHandler.getFailure()).isInstanceOf(RuntimeException.class);
+        assertThat(resultHandler.getFailure()).hasMessageContaining("exhausted retries");
+        verify(errorCounter).inc(3);
+    }
+
+    @Test
     public void testRetryExhaustionFailsRequest() throws InterruptedException {
         HttpSinkRequestEntry request = new HttpSinkRequestEntry("PUT", "hello".getBytes());
         when(httpClient.putRequests(anyList(), anyString()))
@@ -163,6 +189,7 @@ class HttpSinkWriterTest {
         assertThat(resultHandler.await()).isTrue();
         assertThat(resultHandler.getFailure()).isInstanceOf(RuntimeException.class);
         assertThat(resultHandler.getFailure()).hasMessageContaining("fatal response status");
+        assertThat(resultHandler.getFailure()).hasMessageContaining("1 request entry");
         verify(errorCounter).inc(1);
     }
 

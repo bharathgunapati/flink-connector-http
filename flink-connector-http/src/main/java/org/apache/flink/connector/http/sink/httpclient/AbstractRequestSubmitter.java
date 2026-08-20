@@ -22,6 +22,7 @@ import org.apache.flink.connector.http.utils.ThreadUtils;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
 
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest.Builder;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,6 +44,8 @@ public abstract class AbstractRequestSubmitter implements RequestSubmitter {
 
     protected final HttpClient httpClient;
 
+    protected final HttpClient.Version httpVersion;
+
     public AbstractRequestSubmitter(
             HttpSinkConfig sinkConfig,
             String[] headersAndValues,
@@ -59,6 +62,7 @@ public abstract class AbstractRequestSubmitter implements RequestSubmitter {
                                 ThreadUtils.LOGGING_EXCEPTION_HANDLER));
 
         this.httpRequestTimeout = sinkConfig.getRequestTimeout();
+        this.httpVersion = HttpClient.Version.valueOf(sinkConfig.getHttpVersion());
 
         this.httpClient = httpClient;
     }
@@ -67,5 +71,11 @@ public abstract class AbstractRequestSubmitter implements RequestSubmitter {
     public void close() {
         publishingThreadPool.shutdownNow();
         httpClientExecutor.shutdownNow();
+    }
+
+    protected Builder newRequestBuilder() {
+        return java.net.http.HttpRequest.newBuilder()
+                .version(httpVersion)
+                .timeout(httpRequestTimeout);
     }
 }

@@ -31,20 +31,23 @@ import java.util.stream.Collectors;
 
 /**
  * Data class holding {@link HttpSinkRequestEntry} instances that {@link SinkHttpClient} attempted
- * to write, divided into two lists &mdash; successful and failed ones.
+ * to write, divided into successful, retryable failed, and fatal failed entries.
+ *
+ * <p>When request batching is enabled, one HTTP response represents all sink entries included in
+ * that submitted HTTP batch. The response classification therefore applies to the whole batch.
  */
 @Data
 @PublicEvolving
 @ToString
 public class SinkHttpClientResponse {
 
-    /** A list of successfully written requests. */
+    /** A list of successfully written request entries. */
     @NonNull private final List<HttpSinkRequestEntry> successfulRequests;
 
-    /** A list of requests that {@link SinkHttpClient} failed with a retryable failure. */
+    /** A list of request entries that {@link SinkHttpClient} failed with a retryable failure. */
     @NonNull private final List<HttpSinkRequestEntry> failedRequests;
 
-    /** A list of requests that {@link SinkHttpClient} failed with a fatal failure. */
+    /** A list of request entries that {@link SinkHttpClient} failed with a fatal failure. */
     @NonNull private final List<HttpSinkRequestEntry> fatalFailedRequests;
 
     public SinkHttpClientResponse(
