@@ -30,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link HttpSinkClientWithRetry}. */
 class HttpSinkClientWithRetryTest {
@@ -176,5 +177,36 @@ class HttpSinkClientWithRetryTest {
         assertThat(response.getFailedRequests()).isEmpty();
         assertThat(response.getFatalFailedRequests()).isEmpty();
         assertThat(calls).hasValue(2);
+    }
+
+    @Test
+    public void testDoesNotRetryNonIoExceptionFromFailedCompletionStage() {
+        HttpSinkRequestEntry retryableEntry = new HttpSinkRequestEntry("POST", new byte[] {1});
+        AtomicInteger calls = new AtomicInteger();
+        HttpSinkClientWithRetry retryingClient =
+                new HttpSinkClientWithRetry(
+                        RetryConfig.custom()
+                                .maxAttempts(2)
+                                .intervalFunction(IntervalFunction.of(Duration.ofMillis(1)))
+                                .build());
+
+        assertThatThrownBy(
+                        () ->
+                                retryingClient
+                                        .send(
+                                                List.of(retryableEntry),
+                                                requestEntries -> {
+                                                    assertThat(requestEntries)
+                                                            .containsExactly(retryableEntry);
+                                                    calls.incrementAndGet();
+                                                    return CompletableFuture.failedFuture(
+                                                            new RuntimeException(
+                                                                    "callback failed"));
+                                                })
+                                        .join())
+                .hasRootCauseInstanceOf(RuntimeException.class)
+                .hasRootCauseMessage("callback failed");
+
+        assertThat(calls).hasValue(1);
     }
 }

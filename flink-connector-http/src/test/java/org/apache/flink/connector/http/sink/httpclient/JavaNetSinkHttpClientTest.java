@@ -53,6 +53,7 @@ import static org.apache.flink.connector.http.config.HttpConnectorConfigConstant
 import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.SINK_RETRY_FIXED_DELAY_DELAY;
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_HTTP_IGNORED_RESPONSE_CODES;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -100,8 +101,12 @@ class JavaNetSinkHttpClientTest {
     }
 
     private static HttpSinkConfig sinkConfig(Properties properties) {
-        return HttpSinkConfigFactory.fromDataStream(
-                "http://localhost", properties, new Slf4jHttpPostRequestCallback());
+        return sinkConfig(properties, new Slf4jHttpPostRequestCallback());
+    }
+
+    private static HttpSinkConfig sinkConfig(
+            Properties properties, HttpPostRequestCallback<HttpRequest> callback) {
+        return HttpSinkConfigFactory.fromDataStream("http://localhost", properties, callback);
     }
 
     @ParameterizedTest
@@ -311,6 +316,41 @@ class JavaNetSinkHttpClientTest {
     }
 
     @Test
+    public void shouldNotRetryRuntimeExceptionFromCallback() {
+        HttpSinkRequestEntry retryableEntry = new HttpSinkRequestEntry("POST", new byte[] {1});
+        AtomicInteger calls = new AtomicInteger();
+        HttpPostRequestCallback<HttpRequest> throwingCallback =
+                (_response, _request, _endpointUrl, _headerMap) -> {
+                    throw new RuntimeException("callback failed");
+                };
+
+        RequestSubmitterFactory submitterFactory =
+                (_sinkConfig, _headersAndValues) ->
+                        (_endpointUrl, requestToSubmit) -> {
+                            assertThat(requestToSubmit).containsExactly(retryableEntry);
+                            calls.incrementAndGet();
+                            return List.of(responseFutureWithoutStatus(retryableEntry));
+                        };
+
+        Properties properties = new Properties();
+        properties.setProperty(SINK_MAX_RETRIES, "1");
+        properties.setProperty(SINK_RETRY_FIXED_DELAY_DELAY, "1ms");
+        JavaNetSinkHttpClient client =
+                new JavaNetSinkHttpClient(
+                        sinkConfig(properties, throwingCallback),
+                        headerPreprocessor,
+                        submitterFactory);
+
+        assertThatThrownBy(
+                        () ->
+                                client.putRequests(List.of(retryableEntry), "http://localhost")
+                                        .join())
+                .hasRootCauseInstanceOf(RuntimeException.class)
+                .hasRootCauseMessage("callback failed");
+        assertThat(calls).hasValue(1);
+    }
+
+    @Test
     public void closeClosesRequestSubmitter() {
         AtomicBoolean submitterClosed = new AtomicBoolean();
         RequestSubmitterFactory submitterFactory =
@@ -340,19 +380,28 @@ class JavaNetSinkHttpClientTest {
 
     private static CompletableFuture<JavaNetHttpResponseWrapper> responseFuture(
             HttpSinkRequestEntry requestEntry, int statusCode) {
-        HttpRequest request =
-                new HttpRequest(
-                        java.net.http.HttpRequest.newBuilder(
-                                        java.net.URI.create("http://localhost"))
-                                .method(
-                                        requestEntry.method,
-                                        java.net.http.HttpRequest.BodyPublishers.noBody())
-                                .build(),
-                        List.of(requestEntry.element),
-                        requestEntry.method,
-                        List.of(requestEntry));
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(statusCode);
-        return CompletableFuture.completedFuture(new JavaNetHttpResponseWrapper(request, response));
+        return CompletableFuture.completedFuture(
+                new JavaNetHttpResponseWrapper(httpRequest(requestEntry), response));
+    }
+
+    private static CompletableFuture<JavaNetHttpResponseWrapper> responseFutureWithoutStatus(
+            HttpSinkRequestEntry requestEntry) {
+        return CompletableFuture.completedFuture(
+                new JavaNetHttpResponseWrapper(
+                        httpRequest(requestEntry), mock(HttpResponse.class)));
+    }
+
+    private static HttpRequest httpRequest(HttpSinkRequestEntry requestEntry) {
+        return new HttpRequest(
+                java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://localhost"))
+                        .method(
+                                requestEntry.method,
+                                java.net.http.HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                List.of(requestEntry.element),
+                requestEntry.method,
+                List.of(requestEntry));
     }
 }
