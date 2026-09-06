@@ -37,6 +37,9 @@ public class SinkRetryConfigProvider {
     }
 
     private RetryConfig create() {
+        if (sinkConfig.getMaxRetries() == 0) {
+            return RetryConfig.custom().maxAttempts(1).build();
+        }
         return createBuilder().maxAttempts(sinkConfig.getMaxRetries() + 1).build();
     }
 

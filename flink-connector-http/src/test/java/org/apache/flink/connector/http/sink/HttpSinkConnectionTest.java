@@ -255,6 +255,7 @@ public class HttpSinkConnectionTest {
                         .setProperty(
                                 HttpConnectorConfigConstants.SINK_HEADER_PREFIX + "Content-Type",
                                 "application/json")
+                        .setProperty(HttpConnectorConfigConstants.SINK_MAX_RETRIES, "1")
                         .setProperty(
                                 HttpConnectorConfigConstants.SINK_RETRY_FIXED_DELAY_DELAY, "1ms")
                         .build();
@@ -305,6 +306,7 @@ public class HttpSinkConnectionTest {
                                 SinkRequestSubmitMode.BATCH.getMode())
                         .setProperty(
                                 HttpConnectorConfigConstants.SINK_HTTP_BATCH_REQUEST_SIZE, "10")
+                        .setProperty(HttpConnectorConfigConstants.SINK_MAX_RETRIES, "1")
                         .setProperty(
                                 HttpConnectorConfigConstants.SINK_RETRY_FIXED_DELAY_DELAY, "1ms")
                         .build();
@@ -420,6 +422,7 @@ public class HttpSinkConnectionTest {
                         .setProperty(
                                 HttpConnectorConfigConstants.SINK_HEADER_PREFIX + "Content-Type",
                                 "application/json")
+                        .setProperty(HttpConnectorConfigConstants.SINK_MAX_RETRIES, "1")
                         .setProperty(
                                 HttpConnectorConfigConstants.SINK_RETRY_FIXED_DELAY_DELAY, "1ms")
                         .build();

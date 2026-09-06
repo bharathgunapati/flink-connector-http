@@ -31,8 +31,14 @@ class HttpSinkAttemptResult {
 
     private final List<HttpSinkRequestEntry> fatalFailedRequests = new ArrayList<>();
 
+    private final List<HttpSinkRequestEntry> ignoredRequests = new ArrayList<>();
+
     void addSuccessfulRequests(List<HttpSinkRequestEntry> requestEntries) {
         successfulRequests.addAll(requestEntries);
+    }
+
+    void addIgnoredRequests(List<HttpSinkRequestEntry> requestEntries) {
+        ignoredRequests.addAll(requestEntries);
     }
 
     void addRetryableRequests(List<HttpSinkRequestEntry> requestEntries) {
@@ -53,6 +59,10 @@ class HttpSinkAttemptResult {
 
     List<HttpSinkRequestEntry> getFatalFailedRequests() {
         return fatalFailedRequests;
+    }
+
+    List<HttpSinkRequestEntry> getIgnoredRequests() {
+        return ignoredRequests;
     }
 
     boolean hasRetryableRequests() {

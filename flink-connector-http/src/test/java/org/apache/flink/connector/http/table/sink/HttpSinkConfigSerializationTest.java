@@ -96,7 +96,7 @@ public class HttpSinkConfigSerializationTest {
 
         assertThat(config.getRequestTimeout()).isEqualTo(Duration.ofSeconds(30));
         assertThat(config.getWriterThreadPoolSize()).isEqualTo(1);
-        assertThat(config.getMaxRetries()).isEqualTo(3);
+        assertThat(config.getMaxRetries()).isEqualTo(0);
         assertThat(config.getSuccessCodes()).isEqualTo("2XX");
         assertThat(config.getRetryCodes()).isEqualTo("500,503,504");
         assertThat(config.getIgnoredResponseCodes()).isEmpty();

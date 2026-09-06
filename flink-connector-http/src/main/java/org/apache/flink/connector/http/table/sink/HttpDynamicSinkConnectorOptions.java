@@ -78,15 +78,19 @@ public class HttpDynamicSinkConnectorOptions {
                     .intType()
                     .defaultValue(1)
                     .withDescription(
-                            "Sets the size of the thread pool for HTTP sink request processing.");
+                            "Sets the size of the thread pool for HTTP sink request processing. "
+                                    + "Defaults to 1, matching the documented value. "
+                                    + "Older runtime versions used 4 threads when this option "
+                                    + "was unset; set this option to 4 to keep that behaviour.");
 
     public static final ConfigOption<Integer> SINK_MAX_RETRIES =
             ConfigOptions.key(HttpConnectorConfigConstants.SINK_MAX_RETRIES)
                     .intType()
-                    .defaultValue(3)
+                    .defaultValue(0)
                     .withDescription(
                             "The maximum number of retries for failed HTTP sink requests. "
-                                    + "Set to 0 to disable retries.");
+                                    + "Defaults to 0 (retries disabled) so existing jobs keep "
+                                    + "send-once behaviour. Set a positive value to enable retries.");
 
     public static final ConfigOption<String> SINK_HTTP_SUCCESS_CODES =
             ConfigOptions.key(SINK_SUCCESS_CODES)
@@ -94,7 +98,8 @@ public class HttpDynamicSinkConnectorOptions {
                     .defaultValue("2XX")
                     .withDescription(
                             "Comma separated HTTP status codes considered as successful sink responses. "
-                                    + "Use [1-5]XX for groups and '!' for exclusions.");
+                                    + "Use [1-5]XX for groups and '!' for exclusions. "
+                                    + "Ignored when legacy http.sink.error.code properties are set.");
 
     public static final ConfigOption<String> SINK_HTTP_RETRY_CODES =
             ConfigOptions.key(SINK_RETRY_CODES)
@@ -102,7 +107,8 @@ public class HttpDynamicSinkConnectorOptions {
                     .defaultValue("500,503,504")
                     .withDescription(
                             "Comma separated HTTP status codes considered as retryable sink responses. "
-                                    + "Use [1-5]XX for groups and '!' for exclusions.");
+                                    + "Use [1-5]XX for groups and '!' for exclusions. "
+                                    + "Ignored when legacy http.sink.error.code properties are set.");
 
     public static final ConfigOption<String> SINK_HTTP_IGNORED_RESPONSE_CODES =
             ConfigOptions.key(SINK_IGNORE_RESPONSE_CODES)

@@ -66,6 +66,24 @@ class SinkRetryConfigProviderTest {
         assertThat(retryConfig.getIntervalFunction().apply(5)).isEqualTo(1000L);
     }
 
+    @Test
+    public void testSkipsRetryStrategyWhenMaxRetriesIsZero() {
+        Properties properties = new Properties();
+        properties.setProperty(SINK_MAX_RETRIES, "0");
+        properties.setProperty(SINK_RETRY_STRATEGY_TYPE, "not-a-strategy");
+
+        var retryConfig = SinkRetryConfigProvider.create(sinkConfig(properties));
+
+        assertThat(retryConfig.getMaxAttempts()).isEqualTo(1);
+    }
+
+    @Test
+    public void testDefaultMaxRetriesUsesSingleAttempt() {
+        var retryConfig = SinkRetryConfigProvider.create(sinkConfig(new Properties()));
+
+        assertThat(retryConfig.getMaxAttempts()).isEqualTo(1);
+    }
+
     private static org.apache.flink.connector.http.config.HttpSinkConfig sinkConfig(
             Properties properties) {
         return HttpSinkConfigFactory.fromDataStream(

@@ -146,8 +146,10 @@ public class JavaNetSinkHttpClient implements SinkHttpClient {
 
             switch (responseClassifier.classify(optResponse.orElse(null))) {
                 case SUCCESS:
-                case IGNORED:
                     attemptResult.addSuccessfulRequests(sinkRequestEntry.getRequestEntries());
+                    break;
+                case IGNORED:
+                    attemptResult.addIgnoredRequests(sinkRequestEntry.getRequestEntries());
                     break;
                 case RETRYABLE_FAILURE:
                     attemptResult.addRetryableRequests(sinkRequestEntry.getRequestEntries());

@@ -78,6 +78,42 @@ class HttpSinkClientWithRetryTest {
     }
 
     @Test
+    public void testAccumulatesIgnoredRequestsAcrossAttempts() {
+        HttpSinkRequestEntry ignoredEntry = new HttpSinkRequestEntry("POST", new byte[] {1});
+        HttpSinkRequestEntry retryableEntry = new HttpSinkRequestEntry("POST", new byte[] {2});
+        AtomicInteger calls = new AtomicInteger();
+        HttpSinkClientWithRetry retryingClient =
+                new HttpSinkClientWithRetry(
+                        RetryConfig.custom()
+                                .maxAttempts(2)
+                                .intervalFunction(IntervalFunction.of(Duration.ofMillis(1)))
+                                .build());
+
+        var response =
+                retryingClient
+                        .send(
+                                List.of(ignoredEntry, retryableEntry),
+                                requestEntries -> {
+                                    HttpSinkAttemptResult attemptResult =
+                                            new HttpSinkAttemptResult();
+                                    if (calls.getAndIncrement() == 0) {
+                                        attemptResult.addIgnoredRequests(List.of(ignoredEntry));
+                                        attemptResult.addRetryableRequests(List.of(retryableEntry));
+                                    } else {
+                                        attemptResult.addSuccessfulRequests(
+                                                List.of(retryableEntry));
+                                    }
+                                    return CompletableFuture.completedFuture(attemptResult);
+                                })
+                        .join();
+
+        assertThat(response.getSuccessfulRequests()).containsExactly(retryableEntry);
+        assertThat(response.getIgnoredRequests()).containsExactly(ignoredEntry);
+        assertThat(response.getFailedRequests()).isEmpty();
+        assertThat(response.getFatalFailedRequests()).isEmpty();
+    }
+
+    @Test
     public void testReturnsRetryableRequestsAfterRetriesAreExhausted() {
         HttpSinkRequestEntry retryableEntry = new HttpSinkRequestEntry("POST", new byte[] {1});
         AtomicInteger calls = new AtomicInteger();
@@ -104,6 +140,40 @@ class HttpSinkClientWithRetryTest {
 
         assertThat(response.getSuccessfulRequests()).isEmpty();
         assertThat(response.getFailedRequests()).containsExactly(retryableEntry);
+        assertThat(response.getFatalFailedRequests()).isEmpty();
+        assertThat(calls).hasValue(2);
+    }
+
+    @Test
+    public void testRetriesIoExceptionFromFailedCompletionStage() {
+        HttpSinkRequestEntry retryableEntry = new HttpSinkRequestEntry("POST", new byte[] {1});
+        AtomicInteger calls = new AtomicInteger();
+        HttpSinkClientWithRetry retryingClient =
+                new HttpSinkClientWithRetry(
+                        RetryConfig.custom()
+                                .maxAttempts(2)
+                                .intervalFunction(IntervalFunction.of(Duration.ofMillis(1)))
+                                .build());
+
+        var response =
+                retryingClient
+                        .send(
+                                List.of(retryableEntry),
+                                requestEntries -> {
+                                    assertThat(requestEntries).containsExactly(retryableEntry);
+                                    if (calls.getAndIncrement() == 0) {
+                                        return CompletableFuture.failedFuture(
+                                                new java.io.IOException("connection reset"));
+                                    }
+                                    HttpSinkAttemptResult attemptResult =
+                                            new HttpSinkAttemptResult();
+                                    attemptResult.addSuccessfulRequests(List.of(retryableEntry));
+                                    return CompletableFuture.completedFuture(attemptResult);
+                                })
+                        .join();
+
+        assertThat(response.getSuccessfulRequests()).containsExactly(retryableEntry);
+        assertThat(response.getFailedRequests()).isEmpty();
         assertThat(response.getFatalFailedRequests()).isEmpty();
         assertThat(calls).hasValue(2);
     }

@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 
 /**
  * Data class holding {@link HttpSinkRequestEntry} instances that {@link SinkHttpClient} attempted
- * to write, divided into two lists &mdash; successful and failed ones.
+ * to write, divided by the outcome of their HTTP response.
  */
 @Data
 @PublicEvolving
@@ -47,20 +47,48 @@ public class SinkHttpClientResponse {
     /** A list of requests that {@link SinkHttpClient} failed with a fatal failure. */
     @NonNull private final List<HttpSinkRequestEntry> fatalFailedRequests;
 
+    /**
+     * A list of requests whose response status code was configured as ignored. They are neither
+     * retried nor treated as failures.
+     */
+    @NonNull private final List<HttpSinkRequestEntry> ignoredRequests;
+
+    public SinkHttpClientResponse(
+            List<HttpSinkRequestEntry> successfulRequests,
+            List<HttpSinkRequestEntry> failedRequests,
+            List<HttpSinkRequestEntry> fatalFailedRequests,
+            List<HttpSinkRequestEntry> ignoredRequests) {
+        this.successfulRequests = successfulRequests;
+        this.failedRequests = failedRequests;
+        this.fatalFailedRequests = fatalFailedRequests;
+        this.ignoredRequests = ignoredRequests;
+    }
+
     public SinkHttpClientResponse(
             List<HttpSinkRequestEntry> successfulRequests,
             List<HttpSinkRequestEntry> failedRequests,
             List<HttpSinkRequestEntry> fatalFailedRequests) {
-        this.successfulRequests = successfulRequests;
-        this.failedRequests = failedRequests;
-        this.fatalFailedRequests = fatalFailedRequests;
+        this(successfulRequests, failedRequests, fatalFailedRequests, Collections.emptyList());
     }
 
-    /** Compatibility constructor for custom clients built against the previous response shape. */
+    /**
+     * Compatibility constructor for custom clients built against the previous response shape, which
+     * grouped requests as {@link HttpRequest}. The given requests are flattened into their {@link
+     * HttpSinkRequestEntry} elements.
+     *
+     * @deprecated Use {@link #SinkHttpClientResponse(List, List, List, List)} instead. Note that
+     *     {@link #getSuccessfulRequests()} and {@link #getFailedRequests()} now return {@link
+     *     HttpSinkRequestEntry} elements instead of {@link HttpRequest}, so custom clients that
+     *     read these lists must be updated and recompiled.
+     */
     @Deprecated
     public SinkHttpClientResponse(
             List<HttpRequest> successfulRequests, List<HttpRequest> failedRequests) {
-        this(flatten(successfulRequests), flatten(failedRequests), Collections.emptyList());
+        this(
+                flatten(successfulRequests),
+                flatten(failedRequests),
+                Collections.emptyList(),
+                Collections.emptyList());
     }
 
     private static List<HttpSinkRequestEntry> flatten(List<HttpRequest> requests) {

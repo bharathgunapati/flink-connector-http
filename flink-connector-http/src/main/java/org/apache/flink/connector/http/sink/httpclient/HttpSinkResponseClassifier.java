@@ -26,11 +26,17 @@ import org.apache.flink.connector.http.status.HttpResponseChecker;
 import org.apache.flink.util.ConfigurationException;
 import org.apache.flink.util.StringUtils;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.net.http.HttpResponse;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Classifies HTTP sink responses using sink status-code configuration. */
+import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_HTTP_RETRY_CODES;
+import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_HTTP_SUCCESS_CODES;
+
+/** Maps HTTP sink responses to a status using sink status-code configuration. */
+@Slf4j
 public class HttpSinkResponseClassifier {
 
     private final Set<Integer> ignoredResponseCodes;
@@ -90,6 +96,15 @@ public class HttpSinkResponseClassifier {
         if (!hasLegacyErrorCodes && !hasLegacyExcludedCodes) {
             return null;
         }
+
+        log.warn(
+                "Legacy HTTP sink error-code properties are set ({} / {}). "
+                        + "{} and {} are ignored. Remove the legacy properties to use "
+                        + "the new sink status-code options.",
+                HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST,
+                HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST,
+                SINK_HTTP_SUCCESS_CODES.key(),
+                SINK_HTTP_RETRY_CODES.key());
 
         return new ComposeHttpStatusCodeChecker(
                 ComposeHttpStatusCodeCheckerConfig.builder()

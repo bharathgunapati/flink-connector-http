@@ -178,8 +178,8 @@ class JavaNetSinkHttpClientTest {
                                 "http://localhost")
                         .join();
 
-        assertThat(response.getSuccessfulRequests())
-                .containsExactlyInAnyOrder(successfulEntry, ignoredEntry);
+        assertThat(response.getSuccessfulRequests()).containsExactly(successfulEntry);
+        assertThat(response.getIgnoredRequests()).containsExactly(ignoredEntry);
         assertThat(response.getFailedRequests()).containsExactly(retryableEntry);
         assertThat(response.getFatalFailedRequests()).containsExactly(fatalEntry);
     }
@@ -276,6 +276,38 @@ class JavaNetSinkHttpClientTest {
         assertThat(response.getFailedRequests()).containsExactly(retryableEntry);
         assertThat(response.getFatalFailedRequests()).isEmpty();
         assertThat(calls).hasValue(3);
+    }
+
+    @Test
+    public void shouldRetryIoExceptionFromFailedCompletionStage() {
+        HttpSinkRequestEntry retryableEntry = new HttpSinkRequestEntry("POST", new byte[] {1});
+        AtomicInteger calls = new AtomicInteger();
+
+        RequestSubmitterFactory submitterFactory =
+                (_sinkConfig, _headersAndValues) ->
+                        (_endpointUrl, requestToSubmit) -> {
+                            assertThat(requestToSubmit).containsExactly(retryableEntry);
+                            if (calls.getAndIncrement() == 0) {
+                                return List.of(
+                                        CompletableFuture.failedFuture(
+                                                new java.io.IOException("connection reset")));
+                            }
+                            return List.of(responseFuture(retryableEntry, 200));
+                        };
+
+        Properties properties = new Properties();
+        properties.setProperty(SINK_MAX_RETRIES, "1");
+        properties.setProperty(SINK_RETRY_FIXED_DELAY_DELAY, "1ms");
+        JavaNetSinkHttpClient client =
+                new JavaNetSinkHttpClient(
+                        sinkConfig(properties), headerPreprocessor, submitterFactory);
+
+        var response = client.putRequests(List.of(retryableEntry), "http://localhost").join();
+
+        assertThat(response.getSuccessfulRequests()).containsExactly(retryableEntry);
+        assertThat(response.getFailedRequests()).isEmpty();
+        assertThat(response.getFatalFailedRequests()).isEmpty();
+        assertThat(calls).hasValue(2);
     }
 
     @Test

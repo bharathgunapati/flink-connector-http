@@ -23,6 +23,7 @@ import org.apache.flink.connector.http.sink.HttpSinkRequestEntry;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -55,6 +56,7 @@ class HttpSinkClientWithRetry {
                 Retry.of(
                         "http-sink-connector",
                         RetryConfig.<HttpSinkAttemptResult>from(retryConfig)
+                                .retryOnException(HttpSinkClientWithRetry::isRetryableIoException)
                                 .retryOnResult(
                                         attemptResult -> {
                                             responseAccumulator.add(attemptResult);
@@ -86,14 +88,27 @@ class HttpSinkClientWithRetry {
         retryScheduler.shutdownNow();
     }
 
+    static boolean isRetryableIoException(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof IOException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
     private static final class ResponseAccumulator {
         private final List<HttpSinkRequestEntry> successfulRequests = new ArrayList<>();
         private final List<HttpSinkRequestEntry> failedRequests = new ArrayList<>();
         private final List<HttpSinkRequestEntry> fatalFailedRequests = new ArrayList<>();
+        private final List<HttpSinkRequestEntry> ignoredRequests = new ArrayList<>();
 
         private void add(HttpSinkAttemptResult attemptResult) {
             successfulRequests.addAll(attemptResult.getSuccessfulRequests());
             fatalFailedRequests.addAll(attemptResult.getFatalFailedRequests());
+            ignoredRequests.addAll(attemptResult.getIgnoredRequests());
         }
 
         private void markRetriesExhausted(HttpSinkAttemptResult attemptResult) {
@@ -102,7 +117,7 @@ class HttpSinkClientWithRetry {
 
         private SinkHttpClientResponse toResponse() {
             return new SinkHttpClientResponse(
-                    successfulRequests, failedRequests, fatalFailedRequests);
+                    successfulRequests, failedRequests, fatalFailedRequests, ignoredRequests);
         }
     }
 
