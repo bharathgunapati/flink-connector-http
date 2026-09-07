@@ -610,7 +610,7 @@ another format name.
 | http.sink.retry-strategy.exponential-delay.initial-backoff | optional | Initial backoff when using `exponential-delay`. The default is `1s`. |
 | http.sink.retry-strategy.exponential-delay.max-backoff | optional | Maximum backoff when using `exponential-delay`. The default is `1min`. |
 | http.sink.retry-strategy.exponential-delay.backoff-multiplier | optional | Backoff multiplier when using `exponential-delay`. The default is `1.5`. |
-| http.sink.writer.thread-pool.size         | optional | Sets the size of pool thread for HTTP Sink request processing. Increasing this value would mean that more concurrent requests can be processed in the same time. If not specified, the default value of 1 thread will be used. Older connector versions used 4 threads when this option was unset; set this option to 4 to keep that throughput.     |
+| http.sink.writer.thread-pool.size         | optional | Sets the size of pool thread for HTTP Sink request processing. Increasing this value would mean that more concurrent requests can be processed in the same time. If not specified, the default value of 4 threads will be used.     |
 | http.sink.writer.request.mode             | optional | Sets the Http Sink request submission mode. Two modes are available: `single` and `batch`. Defaults to `batch` if not specified. |
 | http.sink.request.batch.size              | optional | Applicable only for `http.sink.writer.request.mode = batch`. Sets number of individual events/requests that will be submitted as one HTTP request by HTTP sink. The default value is 500 which is same as HTTP Sink `maxBatchSize` |
 

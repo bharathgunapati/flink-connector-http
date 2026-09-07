@@ -70,18 +70,16 @@ public class HttpDynamicSinkConnectorOptions {
                     .defaultValue(Slf4jHttpPostRequestCallbackFactory.IDENTIFIER);
 
     /**
-     * Thread pool size for HTTP sink writer response handling. Defaults to 1 thread when not
-     * specified.
+     * Thread pool size for HTTP sink writer response handling. Defaults to 4 threads when not
+     * specified, matching the previous runtime default.
      */
     public static final ConfigOption<Integer> SINK_WRITER_THREAD_POOL_SIZE =
             ConfigOptions.key(SINK_HTTP_WRITER_THREAD_POOL_SIZE)
                     .intType()
-                    .defaultValue(1)
+                    .defaultValue(4)
                     .withDescription(
                             "Sets the size of the thread pool for HTTP sink request processing. "
-                                    + "Defaults to 1, matching the documented value. "
-                                    + "Older runtime versions used 4 threads when this option "
-                                    + "was unset; set this option to 4 to keep that behaviour.");
+                                    + "Defaults to 4 when this option is unset.");
 
     public static final ConfigOption<Integer> SINK_MAX_RETRIES =
             ConfigOptions.key(HttpConnectorConfigConstants.SINK_MAX_RETRIES)
