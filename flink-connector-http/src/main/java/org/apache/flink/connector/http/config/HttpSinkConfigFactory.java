@@ -17,17 +17,22 @@
 
 package org.apache.flink.connector.http.config;
 
+import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.connector.http.HttpPostRequestCallback;
 import org.apache.flink.connector.http.sink.httpclient.HttpRequest;
 import org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions;
+import org.apache.flink.util.StringUtils;
 import org.apache.flink.util.TimeUtils;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_HTTP_IGNORED_RESPONSE_CODES;
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_HTTP_RETRY_CODES;
@@ -50,6 +55,7 @@ public final class HttpSinkConfigFactory {
             Properties properties,
             HttpPostRequestCallback<HttpRequest> httpPostRequestCallback) {
 
+        validateLegacyAndNewStatusCodeOptionsAreExclusive(readableConfig, properties);
         Configuration config =
                 readableConfig instanceof Configuration
                         ? (Configuration) readableConfig
@@ -70,6 +76,7 @@ public final class HttpSinkConfigFactory {
             Properties properties,
             HttpPostRequestCallback<HttpRequest> httpPostRequestCallback) {
 
+        validateLegacyAndNewStatusCodeOptionsAreExclusive(new Configuration(), properties);
         Configuration configuration = new Configuration();
         String requestTimeout =
                 properties.getProperty(HttpConnectorConfigConstants.SINK_HTTP_TIMEOUT_SECONDS);
@@ -172,5 +179,99 @@ public final class HttpSinkConfigFactory {
             return;
         }
         setLegacyIgnoredResponseCodesIfNeeded(configuration, properties);
+    }
+
+    /**
+     * Legacy {@code http.sink.error.code} properties and the new {@code http.sink.success-codes} /
+     * {@code http.sink.retry-codes} options cannot be set together. Legacy {@code
+     * http.sink.error.code.exclude} also cannot be set together with {@code
+     * http.sink.ignored-response-codes}. Defaults on the new options do not count as an explicit
+     * choice.
+     *
+     * <p>{@code http.sink.ignored-response-codes} is detected only from {@code properties}. The
+     * factory may copy legacy exclude into {@link ReadableConfig}; that mapped value is not treated
+     * as user-set.
+     */
+    public static void validateLegacyAndNewStatusCodeOptionsAreExclusive(
+            ReadableConfig readableConfig, Properties properties) {
+        List<String> legacyOptions = collectLegacyErrorCodeOptions(properties);
+        List<String> newOptions = collectExplicitNewStatusCodeOptions(readableConfig, properties);
+        if (!legacyOptions.isEmpty() && !newOptions.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Cannot set legacy HTTP sink error-code properties ("
+                            + String.join(", ", legacyOptions)
+                            + ") together with "
+                            + String.join(" and ", newOptions)
+                            + ". Use either the legacy error-code properties or the new status-code"
+                            + " options.");
+        }
+        validateLegacyExcludeAndIgnoredResponseCodesAreExclusive(properties);
+    }
+
+    /**
+     * Rejects mixing legacy exclude with user-set ignored codes. Ignored is read only from {@code
+     * properties} so a factory-mapped exclude value in {@link ReadableConfig} does not
+     * false-trigger.
+     */
+    private static void validateLegacyExcludeAndIgnoredResponseCodesAreExclusive(
+            Properties properties) {
+        if (!hasNonBlankProperty(
+                properties, HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST)) {
+            return;
+        }
+        if (!hasNonBlankProperty(
+                properties, HttpConnectorConfigConstants.SINK_IGNORE_RESPONSE_CODES)) {
+            return;
+        }
+        throw new IllegalArgumentException(
+                "Cannot set legacy HTTP sink error-code property ("
+                        + HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST
+                        + ") together with "
+                        + SINK_HTTP_IGNORED_RESPONSE_CODES.key()
+                        + ". Use either the legacy exclude property or "
+                        + SINK_HTTP_IGNORED_RESPONSE_CODES.key()
+                        + ".");
+    }
+
+    private static List<String> collectLegacyErrorCodeOptions(Properties properties) {
+        List<String> legacyOptions = new ArrayList<>();
+        addIfNonBlank(
+                legacyOptions, properties, HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST);
+        addIfNonBlank(
+                legacyOptions,
+                properties,
+                HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST);
+        return legacyOptions;
+    }
+
+    private static List<String> collectExplicitNewStatusCodeOptions(
+            ReadableConfig readableConfig, Properties properties) {
+        List<String> newOptions = new ArrayList<>();
+        if (isExplicitlySet(readableConfig, SINK_HTTP_SUCCESS_CODES)
+                || hasNonBlankProperty(
+                        properties, HttpConnectorConfigConstants.SINK_SUCCESS_CODES)) {
+            newOptions.add(SINK_HTTP_SUCCESS_CODES.key());
+        }
+        if (isExplicitlySet(readableConfig, SINK_HTTP_RETRY_CODES)
+                || hasNonBlankProperty(properties, HttpConnectorConfigConstants.SINK_RETRY_CODES)) {
+            newOptions.add(SINK_HTTP_RETRY_CODES.key());
+        }
+        return newOptions.stream().distinct().collect(Collectors.toList());
+    }
+
+    private static boolean isExplicitlySet(
+            ReadableConfig readableConfig, ConfigOption<String> option) {
+        return readableConfig != null && readableConfig.getOptional(option).isPresent();
+    }
+
+    private static void addIfNonBlank(List<String> options, Properties properties, String key) {
+        if (hasNonBlankProperty(properties, key)) {
+            options.add(key);
+        }
+    }
+
+    private static boolean hasNonBlankProperty(Properties properties, String key) {
+        return properties != null
+                && !StringUtils.isNullOrWhitespaceOnly(properties.getProperty(key));
     }
 }

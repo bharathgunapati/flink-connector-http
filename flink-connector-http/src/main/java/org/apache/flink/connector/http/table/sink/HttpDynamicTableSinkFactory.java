@@ -225,6 +225,10 @@ public class HttpDynamicTableSinkFactory extends AsyncDynamicTableSinkFactory {
     }
 
     private void validateHttpSinkStatusCodeOptions(ReadableConfig tableOptions) {
+        Properties httpConnectorProperties = new Properties();
+        tableOptions.toMap().forEach(httpConnectorProperties::setProperty);
+        HttpSinkConfigFactory.validateLegacyAndNewStatusCodeOptionsAreExclusive(
+                tableOptions, httpConnectorProperties);
         try {
             var ignoredCodes =
                     HttpCodesParser.parse(tableOptions.get(SINK_HTTP_IGNORED_RESPONSE_CODES));

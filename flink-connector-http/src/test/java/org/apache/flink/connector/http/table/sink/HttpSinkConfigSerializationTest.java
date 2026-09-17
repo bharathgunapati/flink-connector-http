@@ -30,6 +30,7 @@ import java.io.ObjectOutputStream;
 import java.time.Duration;
 import java.util.Properties;
 
+import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST;
 import static org.apache.flink.connector.http.config.HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST;
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_HTTP_IGNORED_RESPONSE_CODES;
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_HTTP_RETRY_CODES;
@@ -39,6 +40,7 @@ import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnecto
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_RETRY_FIXED_DELAY_DELAY;
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_WRITER_THREAD_POOL_SIZE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link HttpSinkConfig} serialization. */
 public class HttpSinkConfigSerializationTest {
@@ -127,16 +129,20 @@ public class HttpSinkConfigSerializationTest {
     }
 
     @Test
-    public void testNewIgnoredResponseCodesTakePrecedenceOverLegacyIncludeList() {
+    public void testRejectsLegacyExcludeTogetherWithIgnoredResponseCodes() {
         Properties properties = new Properties();
         properties.setProperty(HTTP_ERROR_SINK_CODE_INCLUDE_LIST, "404");
         properties.setProperty(SINK_HTTP_IGNORED_RESPONSE_CODES.key(), "409");
 
-        HttpSinkConfig config =
-                HttpSinkConfigFactory.fromDataStream(
-                        "http://localhost", properties, new Slf4jHttpPostRequestCallback());
-
-        assertThat(config.getIgnoredResponseCodes()).isEqualTo("409");
+        assertThatThrownBy(
+                        () ->
+                                HttpSinkConfigFactory.fromDataStream(
+                                        "http://localhost",
+                                        properties,
+                                        new Slf4jHttpPostRequestCallback()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(HTTP_ERROR_SINK_CODE_INCLUDE_LIST)
+                .hasMessageContaining(SINK_HTTP_IGNORED_RESPONSE_CODES.key());
     }
 
     @Test
@@ -164,5 +170,77 @@ public class HttpSinkConfigSerializationTest {
                         configuration, properties, new Slf4jHttpPostRequestCallback());
 
         assertThat(config.getIgnoredResponseCodes()).isEqualTo("404,405");
+    }
+
+    @Test
+    public void testFromDataStreamRejectsLegacyErrorCodeWithSuccessCodes() {
+        Properties properties = new Properties();
+        properties.setProperty(HTTP_ERROR_SINK_CODES_LIST, "4XX");
+        properties.setProperty(SINK_HTTP_SUCCESS_CODES.key(), "2XX");
+
+        assertThatThrownBy(
+                        () ->
+                                HttpSinkConfigFactory.fromDataStream(
+                                        "http://localhost",
+                                        properties,
+                                        new Slf4jHttpPostRequestCallback()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot set legacy HTTP sink error-code properties")
+                .hasMessageContaining(SINK_HTTP_SUCCESS_CODES.key())
+                .hasMessageNotContaining(SINK_HTTP_RETRY_CODES.key());
+    }
+
+    @Test
+    public void testFromTableOptionsRejectsLegacyErrorCodeWithRetryCodes() {
+        Configuration configuration = new Configuration();
+        configuration.set(HttpDynamicSinkConnectorOptions.URL, "http://localhost");
+        configuration.set(SINK_HTTP_RETRY_CODES, "500,503");
+
+        Properties properties = new Properties();
+        properties.setProperty(HTTP_ERROR_SINK_CODES_LIST, "4XX");
+
+        assertThatThrownBy(
+                        () ->
+                                HttpSinkConfigFactory.fromTableOptions(
+                                        configuration,
+                                        properties,
+                                        new Slf4jHttpPostRequestCallback()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot set legacy HTTP sink error-code properties")
+                .hasMessageContaining(SINK_HTTP_RETRY_CODES.key())
+                .hasMessageNotContaining(SINK_HTTP_SUCCESS_CODES.key());
+    }
+
+    @Test
+    public void testFromDataStreamRejectsLegacyExcludeWithRetryCodes() {
+        Properties properties = new Properties();
+        properties.setProperty(HTTP_ERROR_SINK_CODE_INCLUDE_LIST, "404");
+        properties.setProperty(SINK_HTTP_RETRY_CODES.key(), "500,503");
+
+        assertThatThrownBy(
+                        () ->
+                                HttpSinkConfigFactory.fromDataStream(
+                                        "http://localhost",
+                                        properties,
+                                        new Slf4jHttpPostRequestCallback()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot set legacy HTTP sink error-code properties")
+                .hasMessageContaining(HTTP_ERROR_SINK_CODE_INCLUDE_LIST)
+                .hasMessageContaining(SINK_HTTP_RETRY_CODES.key())
+                .hasMessageNotContaining(SINK_HTTP_SUCCESS_CODES.key());
+    }
+
+    @Test
+    public void testFromDataStreamAllowsLegacyErrorCodeWithIgnoredResponseCodes() {
+        Properties properties = new Properties();
+        properties.setProperty(HTTP_ERROR_SINK_CODES_LIST, "4XX");
+        properties.setProperty(SINK_HTTP_IGNORED_RESPONSE_CODES.key(), "404");
+
+        HttpSinkConfig config =
+                HttpSinkConfigFactory.fromDataStream(
+                        "http://localhost", properties, new Slf4jHttpPostRequestCallback());
+
+        assertThat(config.getIgnoredResponseCodes()).isEqualTo("404");
+        assertThat(config.getProperties().getProperty(HTTP_ERROR_SINK_CODES_LIST)).isEqualTo("4XX");
     }
 }

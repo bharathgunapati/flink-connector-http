@@ -19,6 +19,7 @@ package org.apache.flink.connector.http.sink.httpclient;
 
 import org.apache.flink.connector.http.config.HttpConnectorConfigConstants;
 import org.apache.flink.connector.http.config.HttpSinkConfig;
+import org.apache.flink.connector.http.config.HttpSinkConfigFactory;
 import org.apache.flink.connector.http.status.ComposeHttpStatusCodeChecker;
 import org.apache.flink.connector.http.status.ComposeHttpStatusCodeChecker.ComposeHttpStatusCodeCheckerConfig;
 import org.apache.flink.connector.http.status.HttpCodesParser;
@@ -44,6 +45,11 @@ public class HttpSinkResponseClassifier {
     private final ComposeHttpStatusCodeChecker legacyResponseChecker;
 
     public HttpSinkResponseClassifier(HttpSinkConfig sinkConfig) {
+        // Safety net for hand-built configs; Table/DataStream already validate in the factory.
+        // Ignored-vs-exclude uses properties only, so factory-mapped exclude values do not fail
+        // here.
+        HttpSinkConfigFactory.validateLegacyAndNewStatusCodeOptionsAreExclusive(
+                sinkConfig.getReadableConfig(), sinkConfig.getProperties());
         try {
             ignoredResponseCodes = HttpCodesParser.parse(sinkConfig.getIgnoredResponseCodes());
             legacyResponseChecker = createLegacyResponseChecker(sinkConfig);
@@ -99,8 +105,7 @@ public class HttpSinkResponseClassifier {
 
         log.warn(
                 "Legacy HTTP sink error-code properties are set ({} / {}). "
-                        + "{} and {} are ignored. Remove the legacy properties to use "
-                        + "the new sink status-code options.",
+                        + "These remain supported; prefer {} and {} for new jobs.",
                 HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST,
                 HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST,
                 SINK_HTTP_SUCCESS_CODES.key(),

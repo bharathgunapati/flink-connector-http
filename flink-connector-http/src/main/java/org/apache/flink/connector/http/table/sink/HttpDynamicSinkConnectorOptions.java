@@ -97,7 +97,7 @@ public class HttpDynamicSinkConnectorOptions {
                     .withDescription(
                             "Comma separated HTTP status codes considered as successful sink responses. "
                                     + "Use [1-5]XX for groups and '!' for exclusions. "
-                                    + "Ignored when legacy http.sink.error.code properties are set.");
+                                    + "Cannot be set together with legacy http.sink.error.code properties.");
 
     public static final ConfigOption<String> SINK_HTTP_RETRY_CODES =
             ConfigOptions.key(SINK_RETRY_CODES)
@@ -106,7 +106,7 @@ public class HttpDynamicSinkConnectorOptions {
                     .withDescription(
                             "Comma separated HTTP status codes considered as retryable sink responses. "
                                     + "Use [1-5]XX for groups and '!' for exclusions. "
-                                    + "Ignored when legacy http.sink.error.code properties are set.");
+                                    + "Cannot be set together with legacy http.sink.error.code properties.");
 
     public static final ConfigOption<String> SINK_HTTP_IGNORED_RESPONSE_CODES =
             ConfigOptions.key(SINK_IGNORE_RESPONSE_CODES)
@@ -114,7 +114,8 @@ public class HttpDynamicSinkConnectorOptions {
                     .defaultValue("")
                     .withDescription(
                             "Comma separated HTTP status codes that should be treated as successful "
-                                    + "without retrying.");
+                                    + "without retrying. Cannot be set together with legacy "
+                                    + "http.sink.error.code.exclude.");
 
     public static final ConfigOption<String> SINK_RETRY_STRATEGY =
             ConfigOptions.key(SINK_RETRY_STRATEGY_TYPE)

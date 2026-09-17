@@ -18,6 +18,7 @@
 
 package org.apache.flink.connector.http.table.sink;
 
+import org.apache.flink.connector.http.config.HttpConnectorConfigConstants;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -310,6 +311,76 @@ public class HttpDynamicTableSinkFactoryTest {
         if (insertFailure != null) {
             assertThat(insertFailure)
                     .as("sink retry/status options must be recognized")
+                    .isNotInstanceOf(ValidationException.class);
+        }
+    }
+
+    @Test
+    public void rejectLegacyErrorCodeTogetherWithSuccessCodesTest() {
+        assertInvalidRetryOption(
+                "httpMixedStatusCodes",
+                String.format(
+                        "  '%s' = '4XX',\n" + "  '%s' = '2XX'\n",
+                        HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST,
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_SUCCESS_CODES.key()));
+    }
+
+    @Test
+    public void rejectLegacyErrorCodeTogetherWithRetryCodesTest() {
+        assertInvalidRetryOption(
+                "httpMixedRetryCodes",
+                String.format(
+                        "  '%s' = '4XX',\n" + "  '%s' = '500,503'\n",
+                        HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST,
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_RETRY_CODES.key()));
+    }
+
+    @Test
+    public void rejectLegacyExcludeTogetherWithRetryCodesTest() {
+        assertInvalidRetryOption(
+                "httpMixedExcludeRetryCodes",
+                String.format(
+                        "  '%s' = '404',\n" + "  '%s' = '500,503'\n",
+                        HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST,
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_RETRY_CODES.key()));
+    }
+
+    @Test
+    public void rejectLegacyExcludeTogetherWithIgnoredResponseCodesTest() {
+        assertInvalidRetryOption(
+                "httpMixedIgnoredCodes",
+                String.format(
+                        "  '%s' = '404',\n" + "  '%s' = '409'\n",
+                        HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODE_INCLUDE_LIST,
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_IGNORED_RESPONSE_CODES.key()));
+    }
+
+    @Test
+    public void acceptsLegacyErrorCodeTogetherWithIgnoredResponseCodesTest() {
+        final String ddl =
+                String.format(
+                        "CREATE TABLE httpLegacyErrorWithIgnored (\n"
+                                + "  id bigint\n"
+                                + ") with (\n"
+                                + "  'connector' = '%s',\n"
+                                + "  'url' = '%s',\n"
+                                + "  'format' = 'json',\n"
+                                + "  '%s' = '4XX',\n"
+                                + "  '%s' = '404'\n"
+                                + ")",
+                        HttpDynamicTableSinkFactory.IDENTIFIER,
+                        "http://localhost/",
+                        HttpConnectorConfigConstants.HTTP_ERROR_SINK_CODES_LIST,
+                        HttpDynamicSinkConnectorOptions.SINK_HTTP_IGNORED_RESPONSE_CODES.key());
+        tEnv.executeSql(ddl);
+        Throwable insertFailure =
+                catchThrowable(
+                        () ->
+                                tEnv.executeSql("INSERT INTO httpLegacyErrorWithIgnored VALUES (1)")
+                                        .await());
+        if (insertFailure != null) {
+            assertThat(insertFailure)
+                    .as("legacy error.code with ignored-response-codes must be accepted")
                     .isNotInstanceOf(ValidationException.class);
         }
     }
