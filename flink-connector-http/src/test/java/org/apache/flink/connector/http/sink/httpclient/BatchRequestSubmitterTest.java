@@ -34,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
@@ -48,6 +49,7 @@ import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnecto
 import static org.apache.flink.connector.http.table.sink.HttpDynamicSinkConnectorOptions.SINK_REQUEST_TIMEOUT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
