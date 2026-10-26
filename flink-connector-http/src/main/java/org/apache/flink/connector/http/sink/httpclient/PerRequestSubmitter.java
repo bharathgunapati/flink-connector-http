@@ -54,22 +54,14 @@ public class PerRequestSubmitter extends AbstractRequestSubmitter {
 
         for (var entry : requestToSubmit) {
             HttpRequest httpRequest = buildHttpRequest(entry, endpointUri);
+            long startNanos = System.nanoTime();
             var response =
                     httpClient
                             .sendAsync(
                                     httpRequest.getHttpRequest(),
                                     HttpResponse.BodyHandlers.ofString())
-                            .exceptionally(
-                                    ex -> {
-                                        // TODO This will be executed on a ForkJoinPool Thread...
-                                        // refactor this someday.
-                                        log.error(
-                                                "Request fatally failed because of an exception",
-                                                ex);
-                                        return null;
-                                    })
-                            .thenApplyAsync(
-                                    res -> new JavaNetHttpResponseWrapper(httpRequest, res),
+                            .handleAsync(
+                                    (res, ex) -> wrapOutcome(httpRequest, res, ex, startNanos),
                                     publishingThreadPool);
             responseFutures.add(response);
         }

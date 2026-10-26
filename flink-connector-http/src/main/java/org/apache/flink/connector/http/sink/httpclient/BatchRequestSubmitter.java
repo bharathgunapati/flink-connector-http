@@ -105,17 +105,11 @@ public class BatchRequestSubmitter extends AbstractRequestSubmitter {
             String endpointUrl, List<HttpSinkRequestEntry> requestBatch) {
 
         HttpRequest httpRequest = buildHttpRequest(requestBatch, URI.create(endpointUrl));
+        long startNanos = System.nanoTime();
         return httpClient
                 .sendAsync(httpRequest.getHttpRequest(), HttpResponse.BodyHandlers.ofString())
-                .exceptionally(
-                        ex -> {
-                            // TODO This will be executed on a ForkJoinPool Thread... refactor this
-                            // someday.
-                            log.error("Request fatally failed because of an exception", ex);
-                            return null;
-                        })
-                .thenApplyAsync(
-                        res -> new JavaNetHttpResponseWrapper(httpRequest, res),
+                .handleAsync(
+                        (res, ex) -> wrapOutcome(httpRequest, res, ex, startNanos),
                         publishingThreadPool);
     }
 

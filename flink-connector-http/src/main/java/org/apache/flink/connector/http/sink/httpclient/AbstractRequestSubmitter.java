@@ -28,8 +28,10 @@ import java.net.http.HttpRequest.Builder;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /** Abstract request submitter. */
 public abstract class AbstractRequestSubmitter implements RequestSubmitter {
@@ -115,5 +117,28 @@ public abstract class AbstractRequestSubmitter implements RequestSubmitter {
         headers.add(HttpHeaderUtils.AUTHORIZATION);
         headers.add("Bearer " + accessToken);
         return headers.toArray(new String[0]);
+    }
+
+    /** Milliseconds elapsed since {@code startNanos}, taken from {@link System#nanoTime()}. */
+    protected static long elapsedMillis(long startNanos) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+    }
+
+    /**
+     * Wraps the outcome of one HTTP request. A request that failed before a response arrived is
+     * reported with a {@code null} response and the failure that caused it, so the sink client can
+     * classify, count and log it with the request context.
+     */
+    protected static JavaNetHttpResponseWrapper wrapOutcome(
+            HttpRequest httpRequest,
+            java.net.http.HttpResponse<String> response,
+            Throwable failure,
+            long startNanos) {
+        Throwable cause =
+                failure instanceof CompletionException && failure.getCause() != null
+                        ? failure.getCause()
+                        : failure;
+        return new JavaNetHttpResponseWrapper(
+                httpRequest, response, elapsedMillis(startNanos), cause);
     }
 }
